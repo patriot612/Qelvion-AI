@@ -76,21 +76,41 @@ export async function handleAdminApi(request: Request, env: Env): Promise<Respon
       if (action === 'points') {
         const amount = positiveInt(body.amount, 'amount');
         if (body.direction !== 'add' && body.direction !== 'remove') throw new Response('direction must be add/remove', { status: 400 });
-        if (body.direction === 'remove' && user.balance_points < amount) throw new Response('Balance cannot be negative', { status: 400 });
         if (amount > 0) {
           const kind = body.direction === 'remove' ? 'refund' : 'grant';
-          await env.QELVION_DB.batch([
-            env.QELVION_DB.prepare('INSERT INTO point_ledger (entry_id, operation_id, user_id, kind, amount, created_at, metadata_json) VALUES (?, NULL, ?, ?, ?, ?, ?)').bind(crypto.randomUUID(), userId, kind, amount, new Date().toISOString(), JSON.stringify({ adminTelegramId })),
-            env.QELVION_DB.prepare('UPDATE users SET balance_points = balance_points + ?, updated_at = ? WHERE id = ?').bind(body.direction === 'remove' ? -amount : amount, new Date().toISOString(), userId),
+          const delta = body.direction === 'remove' ? -amount : amount;
+          const now = new Date().toISOString();
+          const ledgerId = crypto.randomUUID();
+          const results = await env.QELVION_DB.batch([
+            env.QELVION_DB.prepare(
+              'UPDATE users SET balance_points = balance_points + ?, updated_at = ? WHERE id = ? AND balance_points + ? >= 0'
+            ).bind(delta, now, userId, delta),
+            env.QELVION_DB.prepare(
+              "INSERT INTO point_ledger (entry_id, operation_id, user_id, kind, amount, created_at, metadata_json) SELECT ?, NULL, id, ?, ?, ?, ? FROM users WHERE id = ? AND changes() = 1"
+            ).bind(ledgerId, userId, kind, amount, now, JSON.stringify({ adminTelegramId }), userId),
           ]);
+          if ((results[0]?.meta?.changes ?? 0) !== 1 || (results[1]?.meta?.changes ?? 0) !== 1) {
+            throw new Response('Balance changed concurrently; retry the operation', { status: 409 });
+          }
         }
       } else if (action === 'balance') {
-        const target = positiveInt(body.value, 'value'); const delta = target - user.balance_points;
+        const target = positiveInt(body.value, 'value');
+        const beforeBalance = user.balance_points;
+        const delta = target - beforeBalance;
         if (delta !== 0) {
-          await env.QELVION_DB.batch([
-            env.QELVION_DB.prepare('INSERT INTO point_ledger (entry_id, operation_id, user_id, kind, amount, created_at, metadata_json) VALUES (?, NULL, ?, ?, ?, ?, ?)').bind(crypto.randomUUID(), userId, delta > 0 ? 'grant' : 'refund', Math.abs(delta), new Date().toISOString(), JSON.stringify({ adminTelegramId, reason: 'set_balance' })),
-            env.QELVION_DB.prepare('UPDATE users SET balance_points = ?, updated_at = ? WHERE id = ?').bind(target, new Date().toISOString(), userId),
+          const now = new Date().toISOString();
+          const ledgerId = crypto.randomUUID();
+          const kind = delta > 0 ? 'grant' : 'refund';
+          const results = await env.QELVION_DB.batch([
+            env.QELVION_DB.prepare('UPDATE users SET balance_points = ?, updated_at = ? WHERE id = ? AND balance_points = ?')
+              .bind(target, now, userId, beforeBalance),
+            env.QELVION_DB.prepare(
+              "INSERT INTO point_ledger (entry_id, operation_id, user_id, kind, amount, created_at, metadata_json) SELECT ?, NULL, id, ?, ?, ?, ? FROM users WHERE id = ? AND changes() = 1"
+            ).bind(ledgerId, userId, kind, Math.abs(delta), now, JSON.stringify({ adminTelegramId, reason: 'set_balance' }), userId),
           ]);
+          if ((results[0]?.meta?.changes ?? 0) !== 1 || (results[1]?.meta?.changes ?? 0) !== 1) {
+            throw new Response('Balance changed concurrently; retry the operation', { status: 409 });
+          }
         }
       } else if (action === 'subscription') {
         if (typeof body.value !== 'string') throw new Response('subscription value required', { status: 400 });

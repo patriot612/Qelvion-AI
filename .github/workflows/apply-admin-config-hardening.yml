@@ -1,0 +1,120 @@
+name: Apply admin config hardening
+
+on:
+  push:
+    branches:
+      - fix/production-types-and-runtime
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message != 'fix: validate admin runtime configuration'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: fix/production-types-and-runtime
+          fetch-depth: 1
+
+      - name: Patch admin config validation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/telegram/admin.ts")
+          text = path.read_text()
+
+          marker = """function positiveInt(value: unknown, name: string): number {
+            if (!Number.isInteger(value) || Number(value) < 0) throw new Response(\`\${name} must be a non-negative integer\`, { status: 400 });
+            return Number(value);
+          }
+          """
+
+          replacement = """function positiveInt(value: unknown, name: string): number {
+            if (!Number.isInteger(value) || Number(value) < 0) throw new Response(\`\${name} must be a non-negative integer\`, { status: 400 });
+            return Number(value);
+          }
+
+          export function validateAdminConfigUpdate(key: string, value: unknown, availableModelKeys: readonly string[]): void {
+            if (!CONFIG_KEYS.has(key)) throw new Error('Unknown configuration key');
+
+            switch (key) {
+              case 'search.price':
+                if (!Number.isInteger(value) || Number(value) < 0) throw new Error('search.price must be a non-negative integer');
+                return;
+              case 'search.results_limit':
+                if (!Number.isInteger(value) || Number(value) < 1 || Number(value) > 20) throw new Error('search.results_limit must be an integer between 1 and 20');
+                return;
+              case 'search.timeout_ms':
+                if (!Number.isInteger(value) || Number(value) < 5000 || Number(value) > 26000) throw new Error('search.timeout_ms must be an integer between 5000 and 26000');
+                return;
+              case 'search.enabled':
+                if (typeof value !== 'boolean') throw new Error('search.enabled must be boolean');
+                return;
+              case 'search.language':
+                if (typeof value !== 'string' || value.trim().length === 0 || value.length > 32) throw new Error('search.language must be a non-empty string up to 32 characters');
+                return;
+              case 'search.safesearch':
+                if (!Number.isInteger(value) || Number(value) < 0 || Number(value) > 2) throw new Error('search.safesearch must be an integer between 0 and 2');
+                return;
+              case 'search.time_range':
+                if (value !== null && (typeof value !== 'string' || value.trim().length === 0 || value.length > 16)) throw new Error('search.time_range must be null or a non-empty string up to 16 characters');
+                return;
+              case 'search.editor_model':
+              case 'chat.model':
+                if (typeof value !== 'string' || value.trim().length === 0 || !availableModelKeys.includes(value)) throw new Error(\`\${key} must reference an active model\`);
+                return;
+            }
+          }
+          """
+
+          if text.count(marker) != 1:
+              raise SystemExit("admin config marker not found exactly once")
+          text = text.replace(marker, replacement, 1)
+
+          old = """    if (request.method === 'PUT' && path === 'config') {
+                const body = await jsonBody<{ key: string; value: unknown }>(request); if (!CONFIG_KEYS.has(body.key)) throw new Response('forbidden key', { status: 400 });
+                await config.setJson(body.key, body.value); await repo.addAudit({ adminTelegramId, targetUserId: null, action: 'config.update', beforeJson: '{}', afterJson: JSON.stringify({ key: body.key, value: body.value }) }); return Response.json({ ok: true });
+              }"""
+          new = """    if (request.method === 'PUT' && path === 'config') {
+                const body = await jsonBody<{ key: string; value: unknown }>(request);
+                const activeModels = await env.QELVION_DB.prepare('SELECT key FROM models WHERE active = 1 ORDER BY key').all<{ key: string }>();
+                validateAdminConfigUpdate(body.key, body.value, activeModels.results.map((row) => row.key));
+
+                if (body.key === 'search.editor_model' || body.key === 'chat.model') {
+                  const requiredCapability: AiCapability = body.key === 'search.editor_model' ? 'search-editor' : 'chat';
+                  const model = await models.getActiveByKey(String(body.value));
+                  if (!model || !model.capabilities.includes(requiredCapability)) {
+                    throw new Response(\`Selected model does not support \${requiredCapability}\`, { status: 400 });
+                  }
+                }
+
+                const before = await config.getJson(body.key, null);
+                await config.setJson(body.key, body.value);
+                await repo.addAudit({
+                  adminTelegramId,
+                  targetUserId: null,
+                  action: 'config.update',
+                  beforeJson: JSON.stringify({ key: body.key, value: before }),
+                  afterJson: JSON.stringify({ key: body.key, value: body.value }),
+                });
+                return Response.json({ ok: true });
+              }"""
+          if text.count(old) != 1:
+              raise SystemExit("config endpoint block not found exactly once")
+          text = text.replace(old, new, 1)
+
+          path.write_text(text)
+          Path(".github/workflows/apply-admin-config-hardening.yml").unlink()
+          PY
+
+      - name: Commit patch and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/telegram/admin.ts .github/workflows/apply-admin-config-hardening.yml
+          git commit -m "fix: validate admin runtime configuration"
+          git push origin HEAD:fix/production-types-and-runtime

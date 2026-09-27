@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveAdminMiniAppUrl } from '../../src/telegram/updates/router';
+import { resolveAdminMiniAppUrl } from '../../src/core/config/admin-mini-app-url';
 
 describe('resolveAdminMiniAppUrl', () => {
   it('uses the explicitly configured admin URL when present', () => {

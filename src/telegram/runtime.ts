@@ -13,7 +13,7 @@ import { D1DailyPointsRepository } from '../db/repositories/daily-points';
 import type { Env } from '../env';
 import { runChat } from '../features/chat/service';
 import { executeSearch } from '../features/search/service';
-import { resolveDialogLimits } from '../features/dialogs/service';
+import { resolveDialogLimits, enforceDialogLimits } from '../features/dialogs/service';
 import { D1ConfigRepository } from '../db/repositories/config';
 import { createReservedOperation, settleOperation } from '../core/operations/service';
 import { enqueueHeavyTask } from '../queue/producer/enqueue';
@@ -65,6 +65,7 @@ export function createRuntime(env: Env) {
           await dialogs.addMessage(dialog.dialogId, 'user', prompt, limits);
           answer = await runChat(providers, model, `${historyPrompt}User: ${prompt}`, role?.prompt);
           await dialogs.addMessage(dialog.dialogId, 'assistant', answer, limits);
+          await enforceDialogLimits(env.QELVION_DB, user.id, limits);
         } catch (error) {
           try { await settleOperation(operations, points, operationId, 'failure'); } catch { /* preserve original provider/data error */ }
           throw error;

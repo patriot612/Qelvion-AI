@@ -8,7 +8,7 @@ export function createOpenAIProvider(apiKey: string | undefined, timeoutMs = 300
     supports: (capability, _model) => capability === 'chat' || capability === 'search-editor' || capability === 'image' || capability === 'audio' || capability === 'document',
     async generateText(input: GenerateTextInput) {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const timer = setTimeout(() => controller.abort(), input.timeoutMs ?? timeoutMs);
       try {
         const response = await fetch('https://api.openai.com/v1/responses', {
           method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },

@@ -34,7 +34,13 @@ export async function settleOperation(
 ): Promise<void> {
   let operation = await operationRepository.find(operationId);
   if (!operation) throw new Error(`Operation ${operationId} not found`);
-  if (operation.status === 'succeeded' || operation.status === 'failed' || operation.status === 'cancelled' || operation.status === 'delivered' || operation.status === 'delivery_pending') {
+  if (operation.status === 'succeeded' || operation.status === 'failed' || operation.status === 'cancelled' || operation.status === 'delivered') {
+    return;
+  }
+  if (operation.status === 'delivery_pending') {
+    if (result === 'success') return;
+    if (operation.cost > 0) await pointRepository.release(operation.userId, operation.operationId, operation.cost);
+    await operationRepository.transition(operationId, 'delivery_pending', 'failed', { finishedAt: new Date().toISOString(), errorCode: 'DELIVERY_FAILED' });
     return;
   }
   if (operation.status === 'reserved') {

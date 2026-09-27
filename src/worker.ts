@@ -25,8 +25,10 @@ export default {
     }
     if (!(await claimUpdate(env.QELVION_DB, body.update_id))) return new Response('OK', { status: 200 });
     const bot = createTelegramBot(env.TELEGRAM_BOT_TOKEN);
-    const adminMiniAppUrl = resolveAdminMiniAppUrl(url.origin, env.ADMIN_MINI_APP_URL);
-    configureTelegramRoutes(bot, env, ctx, adminMiniAppUrl);
+    const routeEnv: Env = env.ADMIN_MINI_APP_URL
+      ? env
+      : { ...env, ADMIN_MINI_APP_URL: resolveAdminMiniAppUrl(url.origin) };
+    configureTelegramRoutes(bot, routeEnv, ctx);
     try {
       const response = await createWebhookHandler(bot, env.TELEGRAM_WEBHOOK_SECRET)(request);
       if (response.ok) await completeUpdate(env.QELVION_DB, body.update_id);

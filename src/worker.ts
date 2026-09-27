@@ -8,6 +8,7 @@ import { D1HeavyTaskProcessor } from './queue/consumer/processor';
 import { handleAdminApi, adminHtml, authorizeAdminRequest } from './telegram/admin';
 import { claimUpdate, completeUpdate, releaseUpdate } from './telegram/updates/dedupe';
 import { hasValidTelegramWebhookSecret } from './core/security/telegram';
+import { resolveAdminMiniAppUrl } from './core/config/admin-mini-app-url';
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -24,7 +25,8 @@ export default {
     }
     if (!(await claimUpdate(env.QELVION_DB, body.update_id))) return new Response('OK', { status: 200 });
     const bot = createTelegramBot(env.TELEGRAM_BOT_TOKEN);
-    configureTelegramRoutes(bot, env, ctx);
+    const adminMiniAppUrl = resolveAdminMiniAppUrl(url.origin, env.ADMIN_MINI_APP_URL);
+    configureTelegramRoutes(bot, env, ctx, adminMiniAppUrl);
     try {
       const response = await createWebhookHandler(bot, env.TELEGRAM_WEBHOOK_SECRET)(request);
       if (response.ok) await completeUpdate(env.QELVION_DB, body.update_id);

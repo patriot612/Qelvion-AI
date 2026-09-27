@@ -33,7 +33,7 @@ export function createOpenAICompatibleTextProvider(
     supports: (capability) => capability === 'chat' || capability === 'search-editor',
     async generateText(input: GenerateTextInput): Promise<AiTextResult> {
       const data = await requestJson<ChatResponse>(
-        \`\${baseUrl.replace(/\\/$/, '')}/chat/completions\`,
+        baseUrl.replace(/\/$/, '') + '/chat/completions',
         apiKey,
         {
           model: input.model,
@@ -53,7 +53,7 @@ export function createOpenAICompatibleTextProvider(
         : Array.isArray(rawContent)
           ? rawContent.map((part) => part.text ?? '').join('')
           : '';
-      if (!text.trim()) throw new DomainError('PROVIDER_ERROR', \`\${name} returned an empty response\`);
+      if (!text.trim()) throw new DomainError('PROVIDER_ERROR', name + ' returned an empty response');
 
       const usage = data.usage
         ? {
@@ -84,11 +84,11 @@ export function createOpenAICompatibleImageProvider(
     name,
     supports: (capability) => capability === 'image',
     async generateText(): Promise<AiTextResult> {
-      throw new DomainError('PROVIDER_ERROR', \`\${name} does not implement text generation\`);
+      throw new DomainError('PROVIDER_ERROR', name + ' does not implement text generation');
     },
     async generateMedia(_capability, input: GenerateMediaInput): Promise<AiMediaResult> {
       const data = await requestJson<ImageResponse>(
-        \`\${baseUrl.replace(/\\/$/, '')}/images/generations\`,
+        baseUrl.replace(/\/$/, '') + '/images/generations',
         apiKey,
         {
           model: input.model,
@@ -102,8 +102,8 @@ export function createOpenAICompatibleImageProvider(
 
       const item = data.data?.[0];
       if (item?.url) return { result: item.url, provider: name, model: input.model };
-      if (item?.b64_json) return { result: \`data:image/png;base64,\${item.b64_json}\`, provider: name, model: input.model, mimeType: 'image/png' };
-      throw new DomainError('PROVIDER_ERROR', \`\${name} returned no image output\`);
+      if (item?.b64_json) return { result: 'data:image/png;base64,' + item.b64_json, provider: name, model: input.model, mimeType: 'image/png' };
+      throw new DomainError('PROVIDER_ERROR', name + ' returned no image output');
     },
   };
 }
@@ -121,7 +121,7 @@ async function requestJson<T>(
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        Authorization: \`Bearer \${apiKey}\`,
+        Authorization: 'Bearer ' + apiKey,
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
@@ -132,7 +132,7 @@ async function requestJson<T>(
     if (!response.ok) {
       throw new DomainError(
         'PROVIDER_ERROR',
-        \`OpenAI-compatible provider request failed with \${response.status}\`,
+        'OpenAI-compatible provider request failed with ' + response.status,
         response.status === 429 || response.status >= 500,
       );
     }

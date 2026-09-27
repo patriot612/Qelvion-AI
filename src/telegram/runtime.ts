@@ -52,23 +52,25 @@ export function createRuntime(env: Env) {
       const role = await roles.getActive((await config.getJson<string>('chat.role', '')) || 'writer');
       const turnToken = crypto.randomUUID();
       await dialogs.claimTurn(dialog.dialogId, turnToken);
+      let operationId: string | null = null;
       try {
         const history = await dialogs.history(dialog.dialogId, 20);
-        const historyPrompt = history.length ? history.map((item) => `${item.role === 'assistant' ? 'Assistant' : 'User'}: ${item.content}`).join('\n') + '\n\n' : '';
+        const historyPrompt = history.length ? history.map((item) => `${item.role === 'assistant' ? 'Assistant' : 'User'}: ${item.content}`).join('\\n') + '\\n\\n' : '';
         const requestCost = model.pointCost;
-        const operationId = crypto.randomUUID();
+        operationId = crypto.randomUUID();
         const now = new Date().toISOString();
         await createReservedOperation(operations, points, { operationId, requestId, userId: user.id, type: 'chat', provider: model.provider, model: model.providerModelId, cost: requestCost, attempt: 0, createdAt: now, startedAt: null, finishedAt: null, errorCode: null, metadataJson: JSON.stringify({ dialogId: dialog.dialogId, role: role?.key ?? null }) });
-        await dialogs.addMessage(dialog.dialogId, 'user', prompt, limits);
+        let answer: string;
         try {
-          const answer = await runChat(providers, model, `${historyPrompt}User: ${prompt}`, role?.prompt);
+          await dialogs.addMessage(dialog.dialogId, 'user', prompt, limits);
+          answer = await runChat(providers, model, `${historyPrompt}User: ${prompt}`, role?.prompt);
           await dialogs.addMessage(dialog.dialogId, 'assistant', answer, limits);
-          await settleOperation(operations, points, operationId, 'success');
-          return answer;
         } catch (error) {
-          try { await settleOperation(operations, points, operationId, 'failure'); } catch { /* preserve original provider/error state */ }
+          try { await settleOperation(operations, points, operationId, 'failure'); } catch { /* preserve original provider/data error */ }
           throw error;
         }
+        await settleOperation(operations, points, operationId, 'success');
+        return answer;
       } finally {
         await dialogs.releaseTurn(dialog.dialogId, turnToken);
       }

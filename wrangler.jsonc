@@ -3,11 +3,14 @@
   "name": "qelvion-ai",
   "main": "src/worker.ts",
   "compatibility_date": "2026-09-27",
+  "vars": {
+    "SEARXNG_BASE_URL": "https://vayroai-searxng.onrender.com"
+  },
   "d1_databases": [
     {
       "binding": "QELVION_DB",
       "database_name": "qelvion-ai-db",
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "database_id": "23d62e19-79be-4d7e-b32e-df431535fff3",
       "migrations_dir": "src/db/migrations"
     }
   ],

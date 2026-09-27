@@ -18,10 +18,10 @@ export async function verifyTelegramWebAppInitData(
   if (!Number.isInteger(authDate) || authDate <= 0 || nowSeconds - authDate > maxAgeSeconds || authDate > nowSeconds + 30) {
     throw new Error('Expired Telegram initData');
   }
-  const dataCheckString = [...params.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, value]) => `${key}=${value}`)
-    .join('\n');
+  const pairs: Array<[string, string]> = [];
+  params.forEach((value, key) => pairs.push([key, value]));
+  pairs.sort(([a], [b]) => a.localeCompare(b));
+  const dataCheckString = pairs.map(([key, value]) => `${key}=${value}`).join('\n');
   const secretKey = await crypto.subtle.importKey('raw', new TextEncoder().encode('WebAppData'), 'HMAC', false, ['sign']);
   const derived = await crypto.subtle.sign('HMAC', secretKey, new TextEncoder().encode(botToken));
   const derivedHex = Array.from(new Uint8Array(derived)).map((b) => b.toString(16).padStart(2, '0')).join('');

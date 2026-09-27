@@ -6,7 +6,7 @@ export function createGoogleProvider(apiKey: string | undefined, timeoutMs = 300
   return {
     name: 'google', supports: (capability) => capability === 'chat' || capability === 'search-editor',
     async generateText(input: GenerateTextInput) {
-      const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), input.timeoutMs ?? timeoutMs);
       try {
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(input.model)}:generateContent?key=${encodeURIComponent(apiKey)}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ systemInstruction: input.systemPrompt || input.rolePrompt ? { parts: [{ text: input.systemPrompt ?? input.rolePrompt }] } : undefined, contents: [{ role: 'user', parts: [{ text: input.prompt }] }] }), signal: controller.signal });
         if (!response.ok) throw new DomainError('PROVIDER_ERROR', `Google AI request failed with ${response.status}`, response.status === 429 || response.status >= 500);

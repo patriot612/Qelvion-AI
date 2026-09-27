@@ -1,0 +1,31 @@
+name: Qelvion Project Package
+
+on:
+  push:
+    branches:
+      - fix/production-types-and-runtime
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create source package
+        run: |
+          rm -rf package
+          mkdir package
+          rsync -a             --exclude='.git/'             --exclude='node_modules/'             --exclude='.wrangler/'             --exclude='package/'             ./ package/Qelvion-AI/
+
+          cd package
+          zip -qr ../Qelvion-AI-hardening.zip Qelvion-AI
+
+      - name: Upload project ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: Qelvion-AI-hardening
+          path: Qelvion-AI-hardening.zip
+          if-no-files-found: error
+          retention-days: 7

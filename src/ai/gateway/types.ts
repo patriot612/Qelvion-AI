@@ -4,6 +4,7 @@ export interface GenerateTextInput {
   model: string;
   prompt: string;
   rolePrompt?: string;
+  timeoutMs?: number;
   systemPrompt?: string;
 }
 

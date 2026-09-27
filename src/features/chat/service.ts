@@ -7,6 +7,7 @@ export async function runChat(
   prompt: string,
   rolePrompt?: string,
 ): Promise<string> {
-  const result = await generateTextWithGateway(providers, model, { prompt, rolePrompt });
+  const input = rolePrompt === undefined ? { prompt } : { prompt, rolePrompt };
+  const result = await generateTextWithGateway(providers, model, input);
   return result.text;
 }

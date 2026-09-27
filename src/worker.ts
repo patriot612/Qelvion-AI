@@ -6,7 +6,9 @@ import type { HeavyTaskMessage } from './queue/tasks/types';
 import { consumeHeavyTasks } from './queue/consumer/worker';
 import { D1HeavyTaskProcessor } from './queue/consumer/processor';
 import { handleAdminApi, adminHtml, authorizeAdminRequest } from './telegram/admin';
-import { isDuplicateUpdate } from './telegram/updates/dedupe';
+import { claimUpdate, completeUpdate, releaseUpdate } from './telegram/updates/dedupe';
+import { hasValidTelegramWebhookSecret } from './core/security/telegram';
+import { resolveAdminMiniAppUrl } from './core/config/admin-mini-app-url';
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -18,14 +20,28 @@ export default {
     if (url.pathname !== '/telegram/webhook') return new Response('Qelvion-AI', { status: 200 });
     const body = await request.clone().json().catch(() => null) as { update_id?: number } | null;
     if (!body || typeof body.update_id !== 'number') return new Response('Bad Request', { status: 400 });
-    if (await isDuplicateUpdate(env.QELVION_DB, body.update_id)) return new Response('OK', { status: 200 });
+    if (!hasValidTelegramWebhookSecret(request, env.TELEGRAM_WEBHOOK_SECRET)) {
+      return new Response('Unauthorized', { status: 401 });
+    }
+    if (!(await claimUpdate(env.QELVION_DB, body.update_id))) return new Response('OK', { status: 200 });
     const bot = createTelegramBot(env.TELEGRAM_BOT_TOKEN);
-    configureTelegramRoutes(bot, env, ctx);
-    return createWebhookHandler(bot, env.TELEGRAM_WEBHOOK_SECRET)(request);
+    const routeEnv: Env = env.ADMIN_MINI_APP_URL
+      ? env
+      : { ...env, ADMIN_MINI_APP_URL: resolveAdminMiniAppUrl(url.origin) };
+    configureTelegramRoutes(bot, routeEnv, ctx);
+    try {
+      const response = await createWebhookHandler(bot, env.TELEGRAM_WEBHOOK_SECRET)(request);
+      if (response.ok) await completeUpdate(env.QELVION_DB, body.update_id);
+      else await releaseUpdate(env.QELVION_DB, body.update_id);
+      return response;
+    } catch (error) {
+      await releaseUpdate(env.QELVION_DB, body.update_id);
+      throw error;
+    }
   },
 
-  async queue(batch: MessageBatch<HeavyTaskMessage>, env: Env): Promise<void> {
+  async queue(batch, env): Promise<void> {
     const processor = new D1HeavyTaskProcessor(env);
     await consumeHeavyTasks(batch, processor);
   },
-} satisfies ExportedHandler<Env>;
+} satisfies ExportedHandler<Env, HeavyTaskMessage>;

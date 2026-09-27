@@ -6,7 +6,7 @@ export function createAnthropicProvider(apiKey: string | undefined, timeoutMs = 
   return {
     name: 'anthropic', supports: (capability) => capability === 'chat' || capability === 'search-editor',
     async generateText(input: GenerateTextInput) {
-      const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), input.timeoutMs ?? timeoutMs);
       try {
         const response = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify({ model: input.model, max_tokens: 2000, system: input.systemPrompt ?? input.rolePrompt, messages: [{ role: 'user', content: input.prompt }] }), signal: controller.signal });
         if (!response.ok) throw new DomainError('PROVIDER_ERROR', `Anthropic request failed with ${response.status}`, response.status === 429 || response.status >= 500);

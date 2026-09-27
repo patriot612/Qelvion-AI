@@ -72,7 +72,7 @@ export class D1OperationRepository implements OperationRepository {
     if (!current) throw new DomainError('NOT_FOUND', `Operation ${operationId} not found`);
     if (current.status !== from) throw new DomainError('CONFLICT', `Operation ${operationId} is already ${current.status}`);
 
-    await this.db.prepare(`
+    const result = await this.db.prepare(`
       UPDATE operations
       SET status = ?, provider = ?, model = ?, attempt = ?, started_at = ?, finished_at = ?, error_code = ?
       WHERE operation_id = ? AND status = ?
@@ -87,6 +87,9 @@ export class D1OperationRepository implements OperationRepository {
       operationId,
       from,
     ).run();
+    if ((result.meta?.changes ?? 0) !== 1) {
+      throw new DomainError('CONFLICT', `Operation ${operationId} changed concurrently`);
+    }
   }
   async listRecent(limit = 10): Promise<OperationRecord[]> {
     const result = await this.db.prepare('SELECT * FROM operations ORDER BY created_at DESC LIMIT ?').bind(limit).all<OperationDbRow>();

@@ -18,4 +18,27 @@ describe('user creation concurrency', () => {
     const repo = new D1UserRepository(db);
     await expect(repo.getOrCreate(123)).resolves.toEqual(winner);
   });
+  it('uses all user columns when creating a new user', async () => {
+    let capturedSql = '';
+    let capturedArgs: unknown[] = [];
+    const db = {
+      prepare(sql: string) {
+        capturedSql = sql;
+        return {
+          bind(...args: unknown[]) {
+            capturedArgs = args;
+            return this;
+          },
+          async first() { return null; },
+          async run() { return { success: true, meta: { changes: 1 } }; },
+        };
+      },
+    } as unknown as D1Database;
+    const repo = new D1UserRepository(db);
+    const user = await repo.getOrCreate(456);
+    expect(user.telegram_user_id).toBe(456);
+    expect((capturedSql.match(/\?/g) ?? []).length).toBe(13);
+    expect(capturedArgs).toHaveLength(13);
+  });
+
 });

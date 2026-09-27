@@ -47,6 +47,7 @@ export function createRuntime(env: Env) {
       if (user.status !== 'active') throw new Error('User is blocked');
       const limits = await resolveDialogLimits(env.QELVION_DB, user.subscription_status || 'free');
       const dialog = await dialogs.ensureActive(user.id, limits);
+      if (dialog.messageCount + 2 > limits.messagesPerDialog) throw new Error('Dialog message limit reached');
       const model = await models.getDefault('chat');
       if (!model) throw new Error('No active chat model is configured');
       const role = await roles.getActive((await config.getJson<string>('chat.role', '')) || 'writer');

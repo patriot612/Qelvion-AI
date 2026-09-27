@@ -55,7 +55,7 @@ export function createRuntime(env: Env) {
       let operationId: string | null = null;
       try {
         const history = await dialogs.history(dialog.dialogId, 20);
-        const historyPrompt = history.length ? history.map((item) => `${item.role === 'assistant' ? 'Assistant' : 'User'}: ${item.content}`).join('\\n') + '\\n\\n' : '';
+        const historyPrompt = history.length ? history.map((item) => `${item.role === 'assistant' ? 'Assistant' : 'User'}: ${item.content}`).join('\n') + '\n\n' : '';
         const requestCost = model.pointCost;
         operationId = crypto.randomUUID();
         const now = new Date().toISOString();

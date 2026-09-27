@@ -207,24 +207,107 @@ export async function handleAdminApi(request: Request, env: Env): Promise<Respon
 }
 
 export async function adminHtml(): Promise<Response> {
-  const html = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Qelvion Admin</title><style>body{font-family:system-ui;margin:0;padding:12px;background:#f5f5f7;color:#111}header{position:sticky;top:0;background:#f5f5f7;padding:6px 0 12px;z-index:2}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}button{font:inherit;padding:12px;border-radius:12px;border:1px solid #ddd;background:#fff;width:100%;text-align:left}section{background:#fff;border-radius:14px;padding:14px;margin:10px 0}input,select,textarea{font:inherit;padding:10px;width:100%;box-sizing:border-box;border:1px solid #ddd;border-radius:10px;margin:6px 0}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.danger{border-color:#e66}.muted{color:#666;font-size:13px}pre{white-space:pre-wrap;word-break:break-word}</style></head><body><header><h1>Qelvion Admin</h1><div class="grid"><button data-view="dashboard">Dashboard</button><button data-view="users">Users</button><button data-view="models">Models</button><button data-view="roles">AI Roles</button><button data-view="tariffs">Tariffs</button><button data-view="payments">Payments</button><button data-view="operations">Operations</button><button data-view="config">Configuration</button><button data-view="system">Queue / System</button><button data-view="audit">Audit</button></div></header><main id="app"><section>Loading…</section></main><script src="https://telegram.org/js/telegram-web-app.js"></script><script>
-Telegram.WebApp.ready(); const app=document.getElementById('app'); const init=()=>Telegram.WebApp.initData||'';
-async function api(path,opts={}){opts.headers={...(opts.headers||{}),'X-Telegram-Init-Data':init(),'Content-Type':'application/json'};const r=await fetch('/admin/api/'+path,opts);if(!r.ok)throw new Error(await r.text());return r.json()}
-const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
-const formField=(label,id,value='',type='text')=>'<label>'+esc(label)+'<input id="'+id+'" type="'+type+'" value="'+esc(value??'')+'"></label>';
-async function render(view){app.innerHTML='<section>Loading…</section>'; try{
- if(view==='dashboard'){const d=await api('dashboard');app.innerHTML='<section><h2>Dashboard</h2><pre>'+esc(JSON.stringify(d,null,2))+'</pre></section>';}
- else if(view==='users'){const d=await api('users');app.innerHTML='<section><h2>Users</h2><input id="uq" placeholder="Search"><button id="usearch">Search</button></section><div id="usercards"></div>';const cards=document.getElementById('usercards');cards.innerHTML=(d.users||[]).map(u=>'<section><b>'+esc(u.id)+'</b><div class="muted">Telegram: '+esc(u.telegram_user_id)+'</div><div>Balance: '+esc(u.balance_points)+' · Status: '+esc(u.status)+'</div><div class="row"><button data-user-action="add" data-user-id="'+esc(u.id)+'">+10 points</button><button class="danger" data-user-action="block" data-user-id="'+esc(u.id)+'">Block</button></div></section>').join('');cards.querySelectorAll('[data-user-action]').forEach(b=>b.onclick=async()=>{if(!confirm('Подтвердить действие?'))return;const id=b.dataset.userId;const action=b.dataset.userAction;if(action==='add')await api('users/'+encodeURIComponent(id)+'/points',{method:'POST',body:JSON.stringify({amount:10,direction:'add'})});else await api('users/'+encodeURIComponent(id)+'/status',{method:'POST',body:JSON.stringify({value:'blocked'})});await render('users');});document.getElementById('usearch').onclick=async()=>{const q=document.getElementById('uq').value;const x=await api('users?q='+encodeURIComponent(q));cards.innerHTML=x.users.map(u=>'<pre>'+esc(JSON.stringify(u,null,2))+'</pre>').join('');};} else if(view==='models'){const d=await api('models');app.innerHTML='<section><h2>Models</h2><form id="mf">'+formField('Key','mk')+formField('Name','mn')+formField('Provider','mp')+formField('Provider model id','mmi')+formField('Capabilities CSV','mc','chat')+formField('Point cost','mcost',0,'number')+'<button>Save model</button></form></section><section><pre>'+esc(JSON.stringify(d.models,null,2))+'</pre></section>';document.getElementById('mf').onsubmit=async(e)=>{e.preventDefault();await api('models',{method:'POST',body:JSON.stringify({key:mk.value,name:mn.value,provider:mp.value,providerModelId:mmi.value,capabilities:mc.value.split(',').map(s=>s.trim()).filter(Boolean),pointCost:Number(mcost.value)})});await render('models');};}
- else if(view==='roles'){const d=await api('roles');app.innerHTML='<section><h2>AI Roles</h2><form id="rf">'+formField('Key','rk')+formField('Name','rn')+'<textarea id="rp" placeholder="Prompt"></textarea>'+formField('Point cost','rpc',0,'number')+'<button>Save role</button></form></section><section><pre>'+esc(JSON.stringify(d.roles,null,2))+'</pre></section>';document.getElementById('rf').onsubmit=async(e)=>{e.preventDefault();await api('roles',{method:'POST',body:JSON.stringify({key:rk.value,name:rn.value,prompt:rp.value,pointCost:Number(rpc.value)})});await render('roles');};}
- else if(view==='tariffs'){const d=await api('tariffs');app.innerHTML='<section><h2>Tariffs</h2><form id="tf">'+formField('Key','tk')+formField('Name','tn')+formField('Daily points','td',50,'number')+formField('Active dialogs','ta',5,'number')+formField('Archived dialogs','tr',15,'number')+formField('Archive TTL hours','tt',24,'number')+formField('Messages/dialog','tm',50,'number')+'<button>Save tariff</button></form></section><section><pre>'+esc(JSON.stringify(d.tariffs,null,2))+'</pre></section>';document.getElementById('tf').onsubmit=async(e)=>{e.preventDefault();await api('tariffs',{method:'POST',body:JSON.stringify({key:tk.value,name:tn.value,dailyPoints:Number(td.value),activeDialogLimit:Number(ta.value),archivedDialogLimit:Number(tr.value),archiveTtlHours:Number(tt.value),messageLimitPerDialog:Number(tm.value)})});await render('tariffs');};}
- else if(view==='payments'){const d=await api('payments');app.innerHTML='<section><h2>Payments</h2><pre>'+esc(JSON.stringify(d.payments,null,2))+'</pre></section>';}
- else if(view==='operations'){const d=await api('operations');app.innerHTML='<section><h2>Operations</h2><pre>'+esc(JSON.stringify(d.operations,null,2))+'</pre></section>';}
- else if(view==='config'){const d=await api('config');app.innerHTML='<section><h2>Configuration</h2>'+Object.entries(d.values).map(([k,v])=>'<div>'+esc(k)+formField('Value','c_'+k.replace(/[^a-z0-9]/gi,'_'),typeof v==='string'?v:JSON.stringify(v))+'</div>').join('')+'<button id="csave">Save Search Price</button></section>';document.getElementById('csave').onclick=async()=>{const v=document.getElementById('c_search_price').value;await api('config',{method:'PUT',body:JSON.stringify({key:'search.price',value:Number(v)})});};}
- else if(view==='system'){const d=await api('system?health=1');app.innerHTML='<section><h2>Queue / System</h2><pre>'+esc(JSON.stringify(d,null,2))+'</pre></section>';}
- else if(view==='audit'){const d=await api('audit');app.innerHTML='<section><h2>Audit trail</h2><pre>'+esc(JSON.stringify(d.entries,null,2))+'</pre></section>';}
- }catch(e){app.innerHTML='<section><b>Ошибка</b><p>'+esc(e.message)+'</p></section>';}}
-window.userAction=async(id,action,body)=>{if(!confirm('Подтвердить действие?'))return;await api('users/'+encodeURIComponent(id)+'/'+action,{method:'POST',body:JSON.stringify(body)});await render('users');};
-document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>render(b.dataset.view)); render('dashboard');
+  const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Qelvion Admin</title>
+<style>
+:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:light dark}
+body{margin:0;padding:12px;background:#f4f5f7;color:#111}
+header{position:sticky;top:0;background:#f4f5f7;padding:6px 0 12px;z-index:2}
+h1{font-size:22px;margin:4px 0 10px}
+h2{font-size:18px;margin:0 0 10px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+button{font:inherit;padding:10px 12px;border-radius:11px;border:1px solid #d7d7da;background:#fff;width:100%;text-align:left;cursor:pointer}
+button.primary{background:#111;color:#fff}
+button.danger{border-color:#d55}
+button.small{width:auto;padding:7px 9px}
+section{background:#fff;border:1px solid #e2e2e5;border-radius:14px;padding:13px;margin:10px 0}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.row3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+input,select,textarea{font:inherit;padding:9px;width:100%;box-sizing:border-box;border:1px solid #d7d7da;border-radius:10px;margin:5px 0}
+label{display:block;font-size:13px}
+.muted{color:#666;font-size:12px}
+.card{padding:10px;border:1px solid #e5e5e7;border-radius:12px;margin:8px 0}
+.toolbar{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.toolbar>*{flex:1}
+pre{white-space:pre-wrap;word-break:break-word;font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{border-bottom:1px solid #eee;padding:7px;text-align:left;vertical-align:top}
+.badge{display:inline-block;padding:3px 7px;border-radius:999px;background:#eee;font-size:11px}
+details{margin-top:8px}
+</style></head><body>
+<header><h1>Qelvion Admin</h1><div class="grid">
+<button data-view="dashboard">Dashboard</button><button data-view="users">Users</button><button data-view="models">Models</button><button data-view="roles">AI Roles</button><button data-view="tariffs">Tariffs</button><button data-view="payments">Payments</button><button data-view="operations">Operations</button><button data-view="config">Configuration</button><button data-view="system">Queue / System</button><button data-view="audit">Audit</button>
+</div></header><main id="app"><section>Loading…</section></main>
+<script src="https://telegram.org/js/telegram-web-app.js"></script><script>
+Telegram.WebApp.ready();
+const app=document.getElementById('app');
+const init=()=>Telegram.WebApp.initData||'';
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+const api=async(path,opts={})=>{opts.headers={...(opts.headers||{}),'X-Telegram-Init-Data':init(),'Content-Type':'application/json'};const r=await fetch('/admin/api/'+path,opts);if(!r.ok)throw new Error(await r.text());return r.json()};
+const confirmAction=(msg)=>window.confirm(msg);
+const field=(label,id,value='',type='text')=>'<label>'+esc(label)+'<input id="'+id+'" type="'+type+'" value="'+esc(value??'')+'"></label>';
+const selectField=(label,id,value,items)=>'<label>'+esc(label)+'<select id="'+id+'">'+items.map(v=>'<option value="'+esc(v)+'"'+(v===value?' selected':'')+'>'+esc(v)+'</option>').join('')+'</select></label>';
+const json=value=>typeof value==='string'?value:JSON.stringify(value??null);
+async function load(view){app.innerHTML='<section>Loading…</section>';try{
+if(view==='dashboard'){
+ const d=await api('dashboard');
+ app.innerHTML='<section><h2>Dashboard</h2><div class="row3"><div class="card"><b>Users</b><div>'+esc(d.users)+'</div></div><div class="card"><b>Recent ops</b><div>'+esc(d.recentOperations)+'</div></div><div class="card"><b>Search</b><div>'+esc(d.search?.configured?'configured':'unavailable')+'</div></div></div><pre>'+esc(JSON.stringify(d,null,2))+'</pre></section>';
+}
+else if(view==='users'){
+ const q=new URLSearchParams(location.search); const page=Math.max(0,Number(q.get('upage')||'0')); const d=await api('users?limit=25&page='+page+'&q='+encodeURIComponent(q.get('uq')||'')); 
+ app.innerHTML='<section><h2>Users</h2><div class="toolbar"><input id="uq" placeholder="Telegram ID / internal ID" value="'+esc(q.get('uq')||'')+'"><button id="usearch" class="primary small">Search</button></div></section><div id="usercards"></div>';
+ const cards=document.getElementById('usercards');
+ cards.innerHTML=(d.users||[]).map(u=>'<section class="card"><b>'+esc(u.id)+'</b><div class="muted">Telegram: '+esc(u.telegram_user_id)+' · created: '+esc(u.created_at)+'</div><div>Balance: <b>'+esc(u.balance_points)+'</b> · Daily: '+esc(u.daily_points_remaining)+' · '+esc(u.status)+' · '+esc(u.subscription_status)+'</div><details><summary>Actions</summary><div class="row">'+field('Points','amt_'+esc(u.id),10,'number')+'<select id="sub_'+esc(u.id)+'"><option value="free">free</option><option value="'+esc(u.subscription_status)+'" selected>'+esc(u.subscription_status)+'</option></select></div><div class="row"><button data-a="add" data-id="'+esc(u.id)+'">Add points</button><button data-a="remove" data-id="'+esc(u.id)+'" class="danger">Remove points</button></div><div class="row"><button data-a="block" data-id="'+esc(u.id)+'" class="danger">Block</button><button data-a="unblock" data-id="'+esc(u.id)+'">Unblock</button></div><div class="row"><button data-a="subscription" data-id="'+esc(u.id)+'">Set subscription</button><button data-a="balance" data-id="'+esc(u.id)+'">Set balance</button></div></details></section>').join('');
+ cards.querySelectorAll('button[data-a]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.id;const action=btn.dataset.a;if(!id||!action)return;if(!confirmAction('Подтвердить действие?'))return;try{
+   if(action==='add'||action==='remove'){const n=Number(document.getElementById('amt_'+id).value);await api('users/'+encodeURIComponent(id)+'/points',{method:'POST',body:JSON.stringify({amount:n,direction:action==='add'?'add':'remove'})});}
+   else if(action==='block'||action==='unblock') await api('users/'+encodeURIComponent(id)+'/status',{method:'POST',body:JSON.stringify({value:action==='block'?'blocked':'active'})});
+   else if(action==='subscription') await api('users/'+encodeURIComponent(id)+'/subscription',{method:'POST',body:JSON.stringify({value:document.getElementById('sub_'+id).value})});
+   else if(action==='balance'){const n=Number(prompt('Новое количество points'));if(Number.isInteger(n)&&n>=0)await api('users/'+encodeURIComponent(id)+'/balance',{method:'POST',body:JSON.stringify({value:n})});}
+   await load('users');
+ }catch(e){alert(e.message)}}); 
+ document.getElementById('usearch').onclick=()=>{const value=document.getElementById('uq').value;location.search='?uq='+encodeURIComponent(value);};
+}
+else if(view==='models'){
+ const d=await api('models');
+ app.innerHTML='<section><h2>Models</h2><form id="mf">'+field('Key','mk')+field('Name','mn')+field('Provider','mp')+field('Provider model id','mmi')+field('Capabilities CSV','mc','chat')+field('Point cost','mcost',0,'number')+field('Access level','mal','daily')+'<label><input id="mactive" type="checkbox" checked> active</label><button class="primary">Save model</button></form></section><section>'+((d.models||[]).map(m=>'<div class="card"><b>'+esc(m.key)+'</b><div>'+esc(m.provider)+':'+esc(m.providerModelId)+'</div><div>cost '+esc(m.pointCost)+' · '+esc(m.accessLevel)+' · capabilities '+esc((m.capabilities||[]).join(', '))+'</div><button data-edit="'+esc(m.key)+'">Edit</button></div>').join(''))+'</section>';
+ document.getElementById('mf').onsubmit=async e=>{e.preventDefault();await api('models',{method:'POST',body:JSON.stringify({key:mk.value,name:mn.value,provider:mp.value,providerModelId:mmi.value,capabilities:mc.value.split(',').map(s=>s.trim()).filter(Boolean),pointCost:Number(mcost.value),accessLevel:mal.value,active:mactive.checked})});await load('models')};
+ document.querySelectorAll('[data-edit]').forEach(btn=>btn.onclick=async()=>{const m=(d.models||[]).find(x=>x.key===btn.dataset.edit);if(!m)return;mk.value=m.key;mn.value=m.name||m.key;mp.value=m.provider;mmi.value=m.providerModelId;mc.value=(m.capabilities||[]).join(',');mcost.value=m.pointCost;mal.value=m.accessLevel||'daily';mactive.checked=true;window.scrollTo({top:0,behavior:'smooth'})});
+}
+else if(view==='roles'){
+ const d=await api('roles');
+ app.innerHTML='<section><h2>AI Roles</h2><form id="rf">'+field('Key','rk')+field('Name','rn')+'<textarea id="rp" placeholder="Prompt"></textarea>'+field('Point cost','rpc',0,'number')+'<label><input id="ractive" type="checkbox" checked> active</label><button class="primary">Save role</button></form></section><section>'+((d.roles||[]).map(r=>'<div class="card"><b>'+esc(r.key)+'</b><div>'+esc(r.name)+' · cost '+esc(r.pointCost)+' · '+(r.active?'active':'disabled')+'</div><button data-role-edit="'+esc(r.key)+'">Edit</button></div>').join(''))+'</section>';
+ document.getElementById('rf').onsubmit=async e=>{e.preventDefault();await api('roles',{method:'POST',body:JSON.stringify({key:rk.value,name:rn.value,prompt:rp.value,pointCost:Number(rpc.value),active:ractive.checked})});await load('roles')};
+ document.querySelectorAll('[data-role-edit]').forEach(btn=>btn.onclick=()=>{const r=(d.roles||[]).find(x=>x.key===btn.dataset.roleEdit);if(!r)return;rk.value=r.key;rn.value=r.name;rp.value=r.prompt;rpc.value=r.pointCost;ractive.checked=r.active;window.scrollTo({top:0,behavior:'smooth'})});
+}
+else if(view==='tariffs'){
+ const d=await api('tariffs');
+ app.innerHTML='<section><h2>Tariffs</h2><form id="tf">'+field('Key','tk')+field('Name','tn')+field('Daily points','td',50,'number')+field('Active dialogs','ta',5,'number')+field('Archived dialogs','tr',15,'number')+field('Archive TTL hours','tt',24,'number')+field('Messages/dialog','tm',50,'number')+field('Status','ts','active')+'<button class="primary">Save tariff</button></form></section><section>'+((d.tariffs||[]).map(t=>'<div class="card"><b>'+esc(t.key)+'</b><div>'+esc(t.name)+' · '+esc(t.status)+' · daily '+esc(t.daily_points)+'</div><button data-tariff-edit="'+esc(t.key)+'">Edit</button></div>').join(''))+'</section>';
+ document.getElementById('tf').onsubmit=async e=>{e.preventDefault();await api('tariffs',{method:'POST',body:JSON.stringify({key:tk.value,name:tn.value,dailyPoints:Number(td.value),activeDialogLimit:Number(ta.value),archivedDialogLimit:Number(tr.value),archiveTtlHours:Number(tt.value),messageLimitPerDialog:Number(tm.value),status:ts.value})});await load('tariffs')};
+ document.querySelectorAll('[data-tariff-edit]').forEach(btn=>btn.onclick=()=>{const t=(d.tariffs||[]).find(x=>x.key===btn.dataset.tariffEdit);if(!t)return;tk.value=t.key;tn.value=t.name;td.value=t.daily_points;ta.value=t.active_dialog_limit;tr.value=t.archived_dialog_limit;tt.value=t.archive_ttl_hours;tm.value=t.message_limit_per_dialog;ts.value=t.status;window.scrollTo({top:0,behavior:'smooth'})});
+}
+else if(view==='payments'){
+ const offset=Math.max(0,Number(new URLSearchParams(location.search).get('poffset')||'0')); const d=await api('payments?limit=50&offset='+offset);
+ app.innerHTML='<section><h2>Payments</h2><pre>'+esc(JSON.stringify(d.payments||[],null,2))+'</pre></section>';
+}
+else if(view==='operations'){
+ app.innerHTML='<section><h2>Operations</h2><div class="row">'+field('User','ou')+field('Operation ID','oo')+field('Provider','op')+field('Model','om')+'</div><div class="row">'+field('From','of')+field('To','ot')+field('Type','oty')+field('Status','ost')+'</div><button id="osearch" class="primary">Apply filters</button></section><div id="ops"></div>';
+ const params=new URLSearchParams(location.search); const q='operations?'+['user','operationId','provider','model','from','to','type','status'].map(k=>{const id='o'+({user:'u',operationId:'o',provider:'p',model:'m',from:'f',to:'t',type:'ty',status:'st'}[k]);const v=params.get(k)||'';if(v)document.getElementById(id).value=v;return v?encodeURIComponent(k)+'='+encodeURIComponent(v):''}).filter(Boolean).join('&');
+ const d=await api(q);document.getElementById('ops').innerHTML='<section><pre>'+esc(JSON.stringify(d.operations||[],null,2))+'</pre></section>';
+ document.getElementById('osearch').onclick=()=>{const p=new URLSearchParams();[['user','ou'],['operationId','oo'],['provider','op'],['model','om'],['from','of'],['to','ot'],['type','oty'],['status','ost']].forEach(([k,id])=>{const v=document.getElementById(id).value;if(v)p.set(k,v)});location.search=p.toString()};
+}
+else if(view==='config'){
+ const d=await api('config'); const keys=d.keys||[]; 
+ app.innerHTML='<section><h2>Configuration</h2>'+keys.map(k=>'<div class="card"><b>'+esc(k)+'</b>'+field('Value','c_'+k.replace(/[^a-z0-9]/gi,'_'),json(d.values[k]))+'<button data-config="'+esc(k)+'">Save</button></div>').join('')+'</section>';
+ document.querySelectorAll('[data-config]').forEach(btn=>btn.onclick=async()=>{const k=btn.dataset.config;const input=document.getElementById('c_'+k.replace(/[^a-z0-9]/gi,'_'));let value=input.value;try{value=JSON.parse(value)}catch{}await api('config',{method:'PUT',body:JSON.stringify({key:k,value})});btn.textContent='Saved';setTimeout(()=>btn.textContent='Save',1000)});
+}
+else if(view==='system'){
+ const d=await api('system?health=1'); app.innerHTML='<section><h2>Queue / System</h2><p>SearXNG: <span class="badge">'+esc(d.searxng)+'</span></p><pre>'+esc(JSON.stringify(d,null,2))+'</pre></section>';
+}
+else if(view==='audit'){
+ const d=await api('audit'); app.innerHTML='<section><h2>Audit trail</h2><pre>'+esc(JSON.stringify(d.entries||[],null,2))+'</pre></section>';
+}
+}catch(e){app.innerHTML='<section><b>Ошибка</b><p>'+esc(e.message)+'</p></section>';}}
+document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>load(b.dataset.view));
+load('dashboard');
 </script></body></html>`;
-  return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+  return new Response(html,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store'}});
 }

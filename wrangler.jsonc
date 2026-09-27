@@ -3,6 +3,9 @@
   "name": "qelvion-ai",
   "main": "src/worker.ts",
   "compatibility_date": "2026-09-27",
+  "vars": {
+    "SEARXNG_BASE_URL": "https://vayroai-searxng.onrender.com"
+  },
   "d1_databases": [
     {
       "binding": "QELVION_DB",

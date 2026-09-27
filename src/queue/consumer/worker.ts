@@ -12,14 +12,15 @@ export async function consumeHeavyTasks(
   batch: MessageBatch<HeavyTaskMessage>,
   processor: HeavyTaskProcessor,
   failureSink?: HeavyTaskFailureSink,
+  maxRetries = 5,
 ): Promise<void> {
   for (const message of batch.messages) {
     try {
-      await processor.process(message.body);
+      await processor.process(message.body, message.attempts, maxRetries);
       message.ack();
     } catch (error) {
       if (failureSink) await failureSink.report(message.body, error);
-      if (isRetryableQueueError(error)) message.retry();
+      if (isRetryableQueueError(error) && message.attempts < maxRetries) message.retry();
       else message.ack();
     }
   }

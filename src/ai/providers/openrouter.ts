@@ -6,7 +6,7 @@ export function createOpenRouterProvider(apiKey: string | undefined, timeoutMs =
   return {
     name: 'openrouter', supports: (capability) => capability === 'chat' || capability === 'search-editor',
     async generateText(input: GenerateTextInput) {
-      const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), input.timeoutMs ?? timeoutMs);
       try {
         const messages = [{ role: 'system', content: input.systemPrompt ?? input.rolePrompt ?? '' }, { role: 'user', content: input.prompt }].filter((item) => item.content);
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: input.model, messages }), signal: controller.signal });

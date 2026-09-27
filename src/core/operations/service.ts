@@ -25,11 +25,22 @@ export async function settleOperation(
   operationId: string,
   result: 'success' | 'failure',
 ): Promise<void> {
-  const operation = await operationRepository.find(operationId);
+  let operation = await operationRepository.find(operationId);
   if (!operation) throw new Error(`Operation ${operationId} not found`);
-  if (operation.status === 'reserved') {
-    await operationRepository.transition(operationId, 'reserved', 'running', { attempt: operation.attempt + 1, startedAt: new Date().toISOString() });
+  if (operation.status === 'succeeded' || operation.status === 'failed' || operation.status === 'cancelled' || operation.status === 'delivered' || operation.status === 'delivery_pending') {
+    return;
   }
+  if (operation.status === 'reserved') {
+    try {
+      await operationRepository.transition(operationId, 'reserved', 'running', { attempt: operation.attempt + 1, startedAt: new Date().toISOString() });
+      operation = (await operationRepository.find(operationId)) ?? { ...operation, status: 'running' };
+    } catch (error) {
+      const latest = await operationRepository.find(operationId);
+      if (latest && (latest.status === 'succeeded' || latest.status === 'failed' || latest.status === 'cancelled' || latest.status === 'delivered' || latest.status === 'delivery_pending')) return;
+      throw error;
+    }
+  }
+  if (operation.status !== 'running') throw new Error('Operation is not settleable');
   if (result === 'success') {
     if (operation.cost > 0) await pointRepository.capture(operation.userId, operation.operationId, operation.cost);
     await operationRepository.transition(operationId, 'running', 'succeeded', { finishedAt: new Date().toISOString() });

@@ -31,7 +31,7 @@ export class D1HeavyTaskProcessor {
     ].filter((provider): provider is AiProvider => Boolean(provider));
   }
 
-  async process(task: HeavyTaskMessage): Promise<void> {
+  async process(task: HeavyTaskMessage, deliveryAttempt = 1, maxRetries = 5): Promise<void> {
     let operation = await this.operations.find(task.operationId);
     if (!operation) throw new DomainError('NOT_FOUND', 'Operation not found');
     if (operation.status === 'delivered' || operation.status === 'cancelled' || operation.status === 'failed') return;
@@ -50,7 +50,10 @@ export class D1HeavyTaskProcessor {
         await this.operations.transition(operation.operationId, 'running', 'delivery_pending');
         operation = (await this.operations.find(task.operationId))!;
       } catch (error) {
-        await settleOperation(this.operations, this.points, operation.operationId, 'failure');
+        const retryable = error instanceof DomainError ? error.retryable : true;
+        if (!retryable || deliveryAttempt >= maxRetries) {
+          await settleOperation(this.operations, this.points, operation.operationId, 'failure');
+        }
         throw error;
       }
     }
@@ -62,11 +65,16 @@ export class D1HeavyTaskProcessor {
     try {
       const { deliverMediaResult } = await import('./delivery');
       await deliverMediaResult(this.env, task, metadata.result);
-      await this.points.capture(operation.userId, operation.operationId, operation.cost);
-      await this.operations.transition(operation.operationId, 'delivery_pending', 'delivered', { finishedAt: new Date().toISOString() });
     } catch (error) {
+      const retryable = error instanceof DomainError ? error.retryable : true;
+      if (!retryable || deliveryAttempt >= maxRetries) {
+        await settleOperation(this.operations, this.points, operation.operationId, 'failure');
+      }
       throw error;
     }
+
+    await this.points.capture(operation.userId, operation.operationId, operation.cost);
+    await this.operations.transition(operation.operationId, 'delivery_pending', 'delivered', { finishedAt: new Date().toISOString() });
   }
 
   async executeTask(task: HeavyTaskMessage, provider: string | null, providerModelId: string | null): Promise<string> {

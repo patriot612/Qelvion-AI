@@ -56,4 +56,29 @@ describe('operation service', () => {
     expect(repository.transition).not.toHaveBeenCalled();
   });
 
+  it('releases points when reservation succeeds but operation transition fails', async () => {
+    const base: OperationRecord = {
+      operationId: 'op-reservation-fail', requestId: 'req-reservation-fail', userId: 'u-1', type: 'image', status: 'created',
+      provider: null, model: 'image-1', cost: 15, reservedPoints: 0, attempt: 0,
+      createdAt: new Date().toISOString(), startedAt: null, finishedAt: null, errorCode: null, metadataJson: '{}',
+    };
+    const transition = vi.fn(async (_operationId: string, from: string, to: string) => {
+      if (from === 'created' && to === 'reserved') throw new Error('transition failed');
+    });
+    const repository: OperationRepository = {
+      create: vi.fn(async () => undefined),
+      find: vi.fn(async () => base),
+      transition,
+    };
+    const points: PointRepository = {
+      reserve: vi.fn(async () => undefined),
+      capture: vi.fn(async () => undefined),
+      release: vi.fn(async () => undefined),
+    };
+
+    await expect(createReservedOperation(repository, points, base)).rejects.toThrow('transition failed');
+    expect(points.reserve).toHaveBeenCalledWith('u-1', 'op-reservation-fail', 15);
+    expect(points.release).toHaveBeenCalledWith('u-1', 'op-reservation-fail', 15);
+  });
+
 });

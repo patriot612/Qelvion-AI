@@ -1,0 +1,32 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "qelvion-ai",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-09-27",
+  "d1_databases": [
+    {
+      "binding": "QELVION_DB",
+      "database_name": "qelvion-ai-db",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "src/db/migrations"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "queue": "qelvion-heavy-tasks",
+        "binding": "HEAVY_TASK_QUEUE"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "qelvion-heavy-tasks",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "qelvion-heavy-tasks-dlq",
+        "retry_delay": 30
+      }
+    ]
+  }
+}

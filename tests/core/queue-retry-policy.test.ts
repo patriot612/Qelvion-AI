@@ -13,6 +13,13 @@ describe('queue retry policy', () => {
     expect(m.retry).not.toHaveBeenCalled();
   });
 
+  it('stops retrying after the configured retry count is exhausted', async () => {
+    const m = message(body, 6);
+    await consumeHeavyTasks({ messages: [m] } as any, { process: vi.fn().mockRejectedValue(new DomainError('PROVIDER_ERROR', 'temporary', true)) });
+    expect(m.ack).toHaveBeenCalledOnce();
+    expect(m.retry).not.toHaveBeenCalled();
+  });
+
   it('retries explicitly retryable errors', async () => {
     const m = message(body);
     await consumeHeavyTasks({ messages: [m] } as any, { process: vi.fn().mockRejectedValue(new DomainError('PROVIDER_ERROR', 'temporary', true)) });

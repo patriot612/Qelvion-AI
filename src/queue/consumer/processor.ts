@@ -54,7 +54,7 @@ export class D1HeavyTaskProcessor {
         operation = (await this.operations.find(task.operationId))!;
       } catch (error) {
         const retryable = error instanceof DomainError ? error.retryable : true;
-        if (!retryable || deliveryAttempt >= maxRetries) {
+        if (!retryable || deliveryAttempt > maxRetries) {
           await settleOperation(this.operations, this.points, operation.operationId, 'failure');
         }
         throw error;

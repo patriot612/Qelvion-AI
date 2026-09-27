@@ -21,7 +21,7 @@ Secrets:
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_WEBHOOK_SECRET`
 - `ADMIN_TELEGRAM_IDS`
-- only the AI provider secrets actually used (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_AI_API_KEY`, `OPENROUTER_API_KEY`)
+- only the AI provider secrets actually used (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_AI_API_KEY`, `OPENROUTER_API_KEY`, `XKIRO_API_KEY`, `GROQ_API_KEY`, `POLLINATIONS_API_KEY`)
 - optional SearXNG authentication secrets when required by the instance
 
 Safe application configuration:
@@ -115,7 +115,10 @@ SearXNG is queried only through the server-side `SEARXNG_BASE_URL`; the URL is n
 - `ANTHROPIC_API_KEY` (only when an Anthropic model is configured)
 - `GOOGLE_AI_API_KEY` (only when a Google model is configured)
 - `OPENROUTER_API_KEY` (only when an OpenRouter model is configured)
-- `SEARXNG_USERNAME` / `SEARXNG_PASSWORD` (only when the configured SearXNG service requires Basic Auth)
+- `XKIRO_API_KEY` (only when an xKiro model is configured)
+- `GROQ_API_KEY` (only when a Groq model is configured)
+- `POLLINATIONS_API_KEY` (only when a Pollinations image model is configured)
+- `SEARXNG_USERNAME` / `SEARXNG_PASSWORD (only when the configured SearXNG service requires Basic Auth)
 
 ### Cloudflare Variables
 - `SEARXNG_BASE_URL`

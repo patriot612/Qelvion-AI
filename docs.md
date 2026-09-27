@@ -18,7 +18,15 @@ npx wrangler secret put TELEGRAM_WEBHOOK_SECRET
 npx wrangler secret put ADMIN_TELEGRAM_IDS
 ```
 
-Add only provider secrets actually used.
+Add only provider secrets actually used:
+
+- `OPENAI_API_KEY`
+- `ANTHROPIC_API_KEY`
+- `GOOGLE_AI_API_KEY`
+- `OPENROUTER_API_KEY`
+- `XKIRO_API_KEY`
+- `GROQ_API_KEY`
+- `POLLINATIONS_API_KEY`
 
 Do not store any secret in D1, `wrangler.jsonc`, frontend assets, config rows, or Git.
 
@@ -86,6 +94,17 @@ Search price and Search Editor model are configurable through D1/Admin.
 ## 8. AI provider/model configuration
 
 The model registry stores `provider` and `provider_model_id`. A provider secret belongs to the provider, so multiple models can be registered against one provider credential without duplicating API keys.
+
+Current provider adapters:
+- `openai`
+- `anthropic`
+- `google`
+- `openrouter`
+- `xkiro` — OpenAI-compatible `https://api.xkiro.com/v1`
+- `groq` — OpenAI-compatible `https://api.groq.com/openai/v1`
+- `pollinations` — OpenAI-compatible image generation at `https://gen.pollinations.ai/v1/images/generations`
+
+Current production model IDs used by this deployment can be selected in D1/Admin. A single provider key may back multiple model rows; do not create duplicate secrets per model.
 
 API keys are never part of the model registry record.
 

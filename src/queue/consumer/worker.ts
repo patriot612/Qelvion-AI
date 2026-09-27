@@ -20,7 +20,7 @@ export async function consumeHeavyTasks(
       message.ack();
     } catch (error) {
       if (failureSink) await failureSink.report(message.body, error);
-      if (isRetryableQueueError(error) && message.attempts < maxRetries) message.retry();
+      if (isRetryableQueueError(error) && message.attempts <= maxRetries) message.retry();
       else message.ack();
     }
   }

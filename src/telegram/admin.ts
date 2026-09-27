@@ -4,8 +4,16 @@ import { D1ModelRegistry } from '../ai/registry';
 import { D1ConfigRepository } from '../db/repositories/config';
 import { D1AdminRepository } from '../db/repositories/admin';
 import { D1UserRepository } from '../db/repositories/users';
+import type { OperationStatus, OperationType } from '../core/operations/types';
 
 const CONFIG_KEYS = new Set(['search.price','search.results_limit','search.editor_model','search.timeout_ms','search.enabled','search.language','search.safesearch','search.time_range','chat.model']);
+const OPERATION_TYPES: readonly OperationType[] = ['chat','search','image','document','audio','voice','payment'];
+const OPERATION_STATUSES: readonly OperationStatus[] = ['created','reserved','running','succeeded','failed','cancelled','delivery_pending','delivered'];
+
+function parseOptionalEnum<T extends string>(value: string | null, allowed: readonly T[]): T | undefined {
+  if (!value) return undefined;
+  return allowed.includes(value as T) ? value as T : undefined;
+}
 
 export async function authorizeAdminRequest(request: Request, env: Env): Promise<number> {
   const initData = request.headers.get('X-Telegram-Init-Data') ?? '';
@@ -128,14 +136,26 @@ export async function handleAdminApi(request: Request, env: Env): Promise<Respon
     if (request.method === 'GET' && path === 'tariffs') return Response.json({ tariffs: await repo.listTariffs() });
     if (request.method === 'POST' && path === 'tariffs') {
       const body = await jsonBody<{ key: string; name: string; status?: string; dailyPoints?: number; activeDialogLimit?: number; archivedDialogLimit?: number; archiveTtlHours?: number; messageLimitPerDialog?: number; config?: Record<string, unknown> }>(request);
-      await repo.upsertTariff({ key: body.key, name: body.name, status: body.status ?? 'active', dailyPoints: positiveInt(body.dailyPoints ?? 50, 'dailyPoints'), activeDialogLimit: positiveInt(body.activeDialogLimit ?? 5, 'activeDialogLimit'), archivedDialogLimit: positiveInt(body.archivedDialogLimit ?? 15, 'archivedDialogLimit'), archiveTtlHours: Math.max(1, positiveInt(body.archiveTtlHours ?? 24, 'archiveTtlHours')), messageLimitPerDialog: Math.max(1, positiveInt(body.messageLimitPerDialog ?? 50, 'messageLimitPerDialog')), config: body.config });
+      await repo.upsertTariff({ key: body.key, name: body.name, status: body.status ?? 'active', dailyPoints: positiveInt(body.dailyPoints ?? 50, 'dailyPoints'), activeDialogLimit: positiveInt(body.activeDialogLimit ?? 5, 'activeDialogLimit'), archivedDialogLimit: positiveInt(body.archivedDialogLimit ?? 15, 'archivedDialogLimit'), archiveTtlHours: Math.max(1, positiveInt(body.archiveTtlHours ?? 24, 'archiveTtlHours')), messageLimitPerDialog: Math.max(1, positiveInt(body.messageLimitPerDialog ?? 50, 'messageLimitPerDialog')), ...(body.config === undefined ? {} : { config: body.config }) });
       await repo.addAudit({ adminTelegramId, targetUserId: null, action: 'tariff.upsert', beforeJson: '{}', afterJson: JSON.stringify(body) });
       return Response.json({ ok: true });
     }
 
     if (request.method === 'GET' && path === 'payments') return Response.json({ payments: await repo.listPayments(Number(url.searchParams.get('limit') ?? 50), Number(url.searchParams.get('offset') ?? 0)) });
     if (request.method === 'GET' && path === 'operations') {
-      return Response.json({ operations: await repo.listOperations({ userId: url.searchParams.get('user') ?? undefined, operationId: url.searchParams.get('operationId') ?? undefined, type: (url.searchParams.get('type') || undefined) as never, status: (url.searchParams.get('status') || undefined) as never, provider: url.searchParams.get('provider') ?? undefined, model: url.searchParams.get('model') ?? undefined, from: url.searchParams.get('from') ?? undefined, to: url.searchParams.get('to') ?? undefined }, 100, 0) });
+      const type = parseOptionalEnum(url.searchParams.get('type'), OPERATION_TYPES);
+      const status = parseOptionalEnum(url.searchParams.get('status'), OPERATION_STATUSES);
+      const filters = {
+        ...(url.searchParams.get('user') ? { userId: url.searchParams.get('user')! } : {}),
+        ...(url.searchParams.get('operationId') ? { operationId: url.searchParams.get('operationId')! } : {}),
+        ...(type === undefined ? {} : { type }),
+        ...(status === undefined ? {} : { status }),
+        ...(url.searchParams.get('provider') ? { provider: url.searchParams.get('provider')! } : {}),
+        ...(url.searchParams.get('model') ? { model: url.searchParams.get('model')! } : {}),
+        ...(url.searchParams.get('from') ? { from: url.searchParams.get('from')! } : {}),
+        ...(url.searchParams.get('to') ? { to: url.searchParams.get('to')! } : {}),
+      };
+      return Response.json({ operations: await repo.listOperations(filters, 100, 0) });
     }
     if (request.method === 'GET' && path === 'audit') return Response.json({ entries: await repo.listAudit() });
     if (request.method === 'GET' && path === 'config') return Response.json({ keys: Array.from(CONFIG_KEYS), values: Object.fromEntries(await Promise.all(Array.from(CONFIG_KEYS).map(async (key) => [key, await config.getJson(key, null)]))) });

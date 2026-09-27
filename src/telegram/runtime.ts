@@ -1,8 +1,3 @@
-import type { AiProvider } from '../ai/gateway/types';
-import { createOpenAIProvider } from '../ai/providers/openai';
-import { createAnthropicProvider } from '../ai/providers/anthropic';
-import { createGoogleProvider } from '../ai/providers/google';
-import { createOpenRouterProvider } from '../ai/providers/openrouter';
 import { D1ModelRegistry } from '../ai/registry';
 import { D1OperationRepository } from '../db/repositories/operations';
 import { D1PointRepository } from '../db/repositories/points';
@@ -11,6 +6,7 @@ import { D1DialogRepository } from '../db/repositories/dialogs';
 import { D1RoleRepository } from '../db/repositories/roles';
 import { D1DailyPointsRepository } from '../db/repositories/daily-points';
 import type { Env } from '../env';
+import { createConfiguredProviders } from '../ai/providers/factory';
 import { runChat } from '../features/chat/service';
 import { executeSearch } from '../features/search/service';
 import { resolveDialogLimits, enforceDialogLimits } from '../features/dialogs/service';
@@ -18,9 +14,7 @@ import { D1ConfigRepository } from '../db/repositories/config';
 import { createReservedOperation, settleOperation } from '../core/operations/service';
 import { enqueueHeavyTask } from '../queue/producer/enqueue';
 
-export function createProviders(env: Env): AiProvider[] {
-  return [createOpenAIProvider(env.OPENAI_API_KEY), createAnthropicProvider(env.ANTHROPIC_API_KEY), createGoogleProvider(env.GOOGLE_AI_API_KEY), createOpenRouterProvider(env.OPENROUTER_API_KEY)].filter((p): p is AiProvider => Boolean(p));
-}
+export { createConfiguredProviders as createProviders } from '../ai/providers/factory';
 
 export function createRuntime(env: Env) {
   const users = new D1UserRepository(env.QELVION_DB);
@@ -30,7 +24,7 @@ export function createRuntime(env: Env) {
   const operations = new D1OperationRepository(env.QELVION_DB);
   const points = new D1PointRepository(env.QELVION_DB);
   const dailyPoints = new D1DailyPointsRepository(env.QELVION_DB);
-  const providers = createProviders(env);
+  const providers = createConfiguredProviders(env);
   const config = new D1ConfigRepository(env.QELVION_DB);
 
   return {

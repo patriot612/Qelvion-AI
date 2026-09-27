@@ -62,12 +62,18 @@ export class D1HeavyTaskProcessor {
     }
 
     if (operation.status !== 'delivery_pending') return;
-    const metadata = JSON.parse(operation.metadataJson || '{}') as { result?: string };
+    const metadata = JSON.parse(operation.metadataJson || '{}') as { result?: string; deliveryMessageId?: number };
     if (!metadata.result) throw new DomainError('INVALID_INPUT', 'Media result missing for delivery');
 
     try {
-      const { deliverMediaResult } = await import('./delivery');
-      await deliverMediaResult(this.env, task, metadata.result);
+      if (typeof metadata.deliveryMessageId !== 'number') {
+        const { deliverMediaResult } = await import('./delivery');
+        const deliveryMessageId = await deliverMediaResult(this.env, task, metadata.result);
+        if (deliveryMessageId !== null) {
+          await this.env.QELVION_DB.prepare('UPDATE operations SET metadata_json = ? WHERE operation_id = ?')
+            .bind(JSON.stringify({ ...metadata, deliveryMessageId }), operation.operationId).run();
+        }
+      }
     } catch (error) {
       const retryable = error instanceof DomainError ? error.retryable : true;
       if (!retryable || deliveryAttempt >= maxRetries) {

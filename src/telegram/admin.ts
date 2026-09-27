@@ -63,7 +63,7 @@ export async function handleAdminApi(request: Request, env: Env): Promise<Respon
     if (request.method === 'GET' && userMatch) {
       const user = await new D1UserRepository(env.QELVION_DB).findById(decodeURIComponent(userMatch[1]));
       if (!user) return new Response('Not found', { status: 404 });
-      return Response.json({ user, operations: await repo.listOperations({ userId: user.id }, 50, 0), payments: await repo.listPayments(50, 0), ledger: await repo.listPointLedger(user.id), dialogs: await repo.listDialogs(user.id) });
+      return Response.json({ user, operations: await repo.listOperations({ userId: user.id }, 50, 0), payments: await repo.listPayments(50, 0, user.id), ledger: await repo.listPointLedger(user.id), dialogs: await repo.listDialogs(user.id) });
     }
 
     const userActionMatch = path.match(/^users\/([^/]+)\/(points|balance|subscription|status)$/);

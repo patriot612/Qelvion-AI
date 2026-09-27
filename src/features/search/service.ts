@@ -15,7 +15,13 @@ export async function executeSearch(deps: SearchExecutionDeps, query: string): P
   await createReservedOperation(deps.operationRepository, deps.pointRepository, { operationId, requestId: deps.requestId, userId: deps.userId, type: 'search', provider: deps.model.provider, model: deps.model.providerModelId, cost: price, attempt: 0, createdAt: now, startedAt: null, finishedAt: null, errorCode: null, metadataJson: JSON.stringify({ query }) });
   try {
     const searchStartedAt = Date.now(); const client = new SearxngClient(baseUrl, searxngTimeout, deps.searxngUsername, deps.searxngPassword); const results = await client.search(query, { limit, language, safeSearch, ...(timeRange ? { timeRange } : {}) });
-    if (results.length === 0) { await settleOperation(deps.operationRepository, deps.pointRepository, operationId, 'success'); return { ...noSearchResultAnswer(), operationId }; }
-    const remainingTimeout = totalTimeout - (Date.now() - searchStartedAt); if (remainingTimeout <= 1000) throw new Error('Search execution deadline exceeded'); const answer = await runSearchEditor(deps.providers, deps.model, query, results, remainingTimeout); await settleOperation(deps.operationRepository, deps.pointRepository, operationId, 'success'); return { ...answer, operationId };
-  } catch (error) { await settleOperation(deps.operationRepository, deps.pointRepository, operationId, 'failure'); throw error; }
+    if (results.length === 0) {
+      await settleOperation(deps.operationRepository, deps.pointRepository, operationId, 'success');
+      return { ...noSearchResultAnswer(), operationId };
+    }
+    const remainingTimeout = totalTimeout - (Date.now() - searchStartedAt); if (remainingTimeout <= 1000) throw new Error('Search execution deadline exceeded');
+    const answer = await runSearchEditor(deps.providers, deps.model, query, results, remainingTimeout);
+    await settleOperation(deps.operationRepository, deps.pointRepository, operationId, 'success');
+    return { ...answer, operationId };
+    } catch (error) { await settleOperation(deps.operationRepository, deps.pointRepository, operationId, 'failure'); throw error; }
 }

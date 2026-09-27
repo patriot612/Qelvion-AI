@@ -26,8 +26,8 @@ describe('queue retry policy', () => {
     expect(m.retry).toHaveBeenCalledOnce();
     expect(m.ack).not.toHaveBeenCalled();
   });
-  it('acks a retryable error on the configured final attempt', async () => {
-    const m = message(body, 5);
+  it('acks a retryable error after the configured retry count is exhausted', async () => {
+    const m = message(body, 6);
     await consumeHeavyTasks({ messages: [m] } as any, { process: vi.fn().mockRejectedValue(new DomainError('PROVIDER_ERROR', 'temporary', true)) }, undefined, 5);
     expect(m.ack).toHaveBeenCalledOnce();
     expect(m.retry).not.toHaveBeenCalled();

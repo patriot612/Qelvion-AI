@@ -95,7 +95,21 @@ export function createRuntime(env: Env) {
       if (user.status !== 'active') throw new Error('User is blocked');
       const model = await models.getDefault('search');
       if (!model) throw new Error('No active Search Editor model is configured');
-      return executeSearch({ db: env.QELVION_DB, providers, operationRepository: operations, pointRepository: points, model, userId: user.id, requestId, searxngBaseUrl: env.SEARXNG_BASE_URL, searxngUsername: env.SEARXNG_USERNAME, searxngPassword: env.SEARXNG_PASSWORD }, query);
+      const searxngBaseUrl = env.SEARXNG_BASE_URL;
+      if (!searxngBaseUrl) throw new Error('Search service is not configured');
+      const searchDeps = {
+        db: env.QELVION_DB,
+        providers,
+        operationRepository: operations,
+        pointRepository: points,
+        model,
+        userId: user.id,
+        requestId,
+        searxngBaseUrl,
+        ...(env.SEARXNG_USERNAME === undefined ? {} : { searxngUsername: env.SEARXNG_USERNAME }),
+        ...(env.SEARXNG_PASSWORD === undefined ? {} : { searxngPassword: env.SEARXNG_PASSWORD }),
+      };
+      return executeSearch(searchDeps, query);
     },
   };
 }

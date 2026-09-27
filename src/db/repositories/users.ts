@@ -20,7 +20,7 @@ export class D1UserRepository {
     const now = new Date().toISOString();
     const user: UserRow = { id: crypto.randomUUID(), telegram_user_id: telegramUserId, language: 'ru', status: 'active', balance_points: 0, daily_points_granted: 50, daily_points_remaining: 50, daily_points_reset_at: now, subscription_status: 'free', active_mode: 'chat', pending_task_type: null, created_at: now, updated_at: now };
     try {
-      await this.db.prepare(`INSERT INTO users (id, telegram_user_id, language, status, balance_points, daily_points_granted, daily_points_remaining, daily_points_reset_at, subscription_status, active_mode, pending_task_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      await this.db.prepare(`INSERT INTO users (id, telegram_user_id, language, status, balance_points, daily_points_granted, daily_points_remaining, daily_points_reset_at, subscription_status, active_mode, pending_task_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .bind(user.id, user.telegram_user_id, user.language, user.status, user.balance_points, user.daily_points_granted, user.daily_points_remaining, user.daily_points_reset_at, user.subscription_status, user.active_mode, user.pending_task_type, user.created_at, user.updated_at).run();
       return user;
     } catch (error) {

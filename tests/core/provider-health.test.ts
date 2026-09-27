@@ -19,6 +19,6 @@ describe('provider configuration status', () => {
       groq: true,
       pollinations: true,
     });
-    expect(JSON.stringify(status)).not.toContain('openai');
+    expect(JSON.stringify(status)).not.toContain('secret');
   });
 });

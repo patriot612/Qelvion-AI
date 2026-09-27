@@ -24,8 +24,8 @@ export default {
     return createWebhookHandler(bot, env.TELEGRAM_WEBHOOK_SECRET)(request);
   },
 
-  async queue(batch: MessageBatch<HeavyTaskMessage>, env: Env): Promise<void> {
+  async queue(batch, env): Promise<void> {
     const processor = new D1HeavyTaskProcessor(env);
     await consumeHeavyTasks(batch, processor);
   },
-} satisfies ExportedHandler<Env>;
+} satisfies ExportedHandler<Env, HeavyTaskMessage>;

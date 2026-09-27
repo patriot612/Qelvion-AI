@@ -86,7 +86,7 @@ describe('OpenAI-compatible provider transport', () => {
     }), { status: 200 })));
 
     const provider = createOpenAICompatibleImageProvider('x', 'secret', 'https://example.test/v1')!;
-    const result = await provider.generateMedia('image', {
+    const result = await provider.generateMedia!('image', {
       model: 'image-a',
       prompt: 'draw',
     });

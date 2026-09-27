@@ -21,7 +21,18 @@ export function createOpenAIProvider(apiKey: string | undefined, timeoutMs = 300
         }
         const data = await response.json() as { output_text?: string; usage?: { input_tokens?: number; output_tokens?: number } };
         if (!data.output_text) throw new DomainError('PROVIDER_ERROR', 'OpenAI returned an empty response');
-        return { text: data.output_text, provider: 'openai', model: input.model, usage: { inputTokens: data.usage?.input_tokens, outputTokens: data.usage?.output_tokens } };
+        const usage = data.usage
+          ? {
+              ...(data.usage.input_tokens === undefined ? {} : { inputTokens: data.usage.input_tokens }),
+              ...(data.usage.output_tokens === undefined ? {} : { outputTokens: data.usage.output_tokens }),
+            }
+          : undefined;
+        return {
+          text: data.output_text,
+          provider: 'openai',
+          model: input.model,
+          ...(usage && Object.keys(usage).length > 0 ? { usage } : {}),
+        };
       } catch (error) {
         if (error instanceof DomainError) throw error;
         throw new DomainError('PROVIDER_ERROR', error instanceof Error && error.name === 'AbortError' ? 'OpenAI request timed out' : 'OpenAI provider unavailable', true);

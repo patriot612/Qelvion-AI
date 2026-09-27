@@ -47,7 +47,18 @@ export class D1PointRepository implements PointRepository {
     if (existing) return;
     const reserve = await this.db.prepare('SELECT amount FROM point_ledger WHERE operation_id = ? AND kind = ?').bind(operationId, 'reserve').first<{ amount: number }>();
     if (!reserve || reserve.amount !== amount) throw new DomainError('CONFLICT', 'Invalid point capture');
-    await this.db.prepare(`INSERT INTO point_ledger (entry_id, operation_id, user_id, kind, amount, created_at, metadata_json) VALUES (?, ?, ?, 'capture', ?, ?, '{}')`).bind(crypto.randomUUID(), operationId, userId, amount, new Date().toISOString()).run();
+    const entryId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    await this.db.batch([
+      this.db.prepare("UPDATE operations SET settlement_kind = 'capture' WHERE operation_id = ? AND status IN ('running','delivery_pending') AND settlement_kind IS NULL").bind(operationId),
+      this.db.prepare("INSERT INTO point_ledger (entry_id, operation_id, user_id, kind, amount, created_at, metadata_json) SELECT ?, ?, ?, 'capture', ?, ?, '{}' FROM operations WHERE operation_id = ? AND settlement_kind = 'capture' AND NOT EXISTS (SELECT 1 FROM point_ledger WHERE operation_id = ? AND kind = 'capture')").bind(entryId, operationId, userId, amount, now, operationId, operationId),
+    ]);
+    const created = await this.db.prepare('SELECT entry_id FROM point_ledger WHERE entry_id = ?').bind(entryId).first<{ entry_id: string }>();
+    if (!created) {
+      const settled = await this.db.prepare('SELECT settlement_kind FROM operations WHERE operation_id = ?').bind(operationId).first<{ settlement_kind: string | null }>();
+      if (settled?.settlement_kind === 'capture') return;
+      throw new DomainError('CONFLICT', 'Point capture conflicted with another settlement');
+    }
   }
 
   async release(userId: string, operationId: string, amount: number): Promise<void> {
@@ -59,10 +70,20 @@ export class D1PointRepository implements PointRepository {
     if (!reserve || reserve.amount !== amount) throw new DomainError('CONFLICT', 'Invalid point release');
     const meta = JSON.parse(reserve.metadata_json) as ReserveMeta;
     const now = new Date().toISOString();
-    await this.db.batch([
-      this.db.prepare('UPDATE users SET daily_points_remaining = daily_points_remaining + ?, balance_points = balance_points + ?, updated_at = ? WHERE id = ?').bind(meta.daily, meta.balance, now, userId),
-      this.db.prepare(`INSERT INTO point_ledger (entry_id, operation_id, user_id, kind, amount, created_at, metadata_json) VALUES (?, ?, ?, 'release', ?, ?, ?)`).bind(crypto.randomUUID(), operationId, userId, amount, now, JSON.stringify(meta)),
+    const entryId = crypto.randomUUID();
+    const results = await this.db.batch([
+      this.db.prepare("UPDATE operations SET settlement_kind = 'release' WHERE operation_id = ? AND status IN ('created','reserved','running','delivery_pending') AND settlement_kind IS NULL").bind(operationId),
+      this.db.prepare("INSERT INTO point_ledger (entry_id, operation_id, user_id, kind, amount, created_at, metadata_json) SELECT ?, ?, ?, 'release', ?, ?, ? FROM operations WHERE operation_id = ? AND settlement_kind = 'release' AND NOT EXISTS (SELECT 1 FROM point_ledger WHERE operation_id = ? AND kind = 'release')").bind(entryId, operationId, userId, amount, now, JSON.stringify(meta), operationId, operationId),
+      this.db.prepare("UPDATE users SET daily_points_remaining = daily_points_remaining + ?, balance_points = balance_points + ?, updated_at = ? WHERE id = ? AND EXISTS (SELECT 1 FROM point_ledger WHERE entry_id = ?)").bind(meta.daily, meta.balance, now, userId, entryId),
     ]);
+    if ((results[1]?.meta?.changes ?? 0) === 1 && (results[2]?.meta?.changes ?? 0) !== 1) {
+      throw new DomainError('CONFLICT', 'Point release could not restore the user balance');
+    }
+    if ((results[1]?.meta?.changes ?? 0) === 0) {
+      const settled = await this.db.prepare('SELECT settlement_kind FROM operations WHERE operation_id = ?').bind(operationId).first<{ settlement_kind: string | null }>();
+      if (settled?.settlement_kind === 'capture' || (await this.db.prepare('SELECT entry_id FROM point_ledger WHERE operation_id = ? AND kind = ?').bind(operationId, 'release').first())) return;
+      throw new DomainError('CONFLICT', 'Point release conflicted with another settlement');
+    }
     const user = await this.db.prepare('SELECT balance_points FROM users WHERE id = ?').bind(userId).first<{ balance_points: number }>();
     if (user) assertNonNegativeBalance(user.balance_points);
   }

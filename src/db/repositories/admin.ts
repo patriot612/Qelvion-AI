@@ -43,8 +43,10 @@ export class D1AdminRepository {
       .bind(input.key,input.name,input.status,input.dailyPoints,input.activeDialogLimit,input.archivedDialogLimit,input.archiveTtlHours,input.messageLimitPerDialog,JSON.stringify(input.config ?? {}),now).run();
   }
 
-  async listPayments(limit = 25, offset = 0): Promise<Array<Record<string, unknown>>> {
-    const result = await this.db.prepare('SELECT * FROM payments ORDER BY created_at DESC LIMIT ? OFFSET ?').bind(limit, offset).all<Record<string, unknown>>();
+  async listPayments(limit = 25, offset = 0, userId?: string): Promise<Array<Record<string, unknown>>> {
+    const result = userId
+      ? await this.db.prepare('SELECT * FROM payments WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?').bind(userId, limit, offset).all<Record<string, unknown>>()
+      : await this.db.prepare('SELECT * FROM payments ORDER BY created_at DESC LIMIT ? OFFSET ?').bind(limit, offset).all<Record<string, unknown>>();
     return result.results;
   }
 

@@ -14,7 +14,18 @@ export function createOpenRouterProvider(apiKey: string | undefined, timeoutMs =
         const data = await response.json() as { choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number } };
         const text = data.choices?.[0]?.message?.content;
         if (!text) throw new DomainError('PROVIDER_ERROR', 'OpenRouter returned an empty response');
-        return { text, provider: 'openrouter', model: input.model, usage: { inputTokens: data.usage?.prompt_tokens, outputTokens: data.usage?.completion_tokens } };
+        const usage = data.usage
+          ? {
+              ...(data.usage.prompt_tokens === undefined ? {} : { inputTokens: data.usage.prompt_tokens }),
+              ...(data.usage.completion_tokens === undefined ? {} : { outputTokens: data.usage.completion_tokens }),
+            }
+          : undefined;
+        return {
+          text,
+          provider: 'openrouter',
+          model: input.model,
+          ...(usage && Object.keys(usage).length > 0 ? { usage } : {}),
+        };
       } catch (error) { if (error instanceof DomainError) throw error; throw new DomainError('PROVIDER_ERROR', 'OpenRouter provider unavailable', true); }
       finally { clearTimeout(timer); }
     },

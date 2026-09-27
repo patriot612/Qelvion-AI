@@ -9,10 +9,17 @@ export async function createReservedOperation(
 ): Promise<OperationRecord> {
   const operation: OperationRecord = { ...input, status: 'created', reservedPoints: input.cost };
   await operationRepository.create(operation);
+  let pointsReserved = false;
   try {
-    if (input.cost > 0) await pointRepository.reserve(input.userId, input.operationId, input.cost);
+    if (input.cost > 0) {
+      await pointRepository.reserve(input.userId, input.operationId, input.cost);
+      pointsReserved = true;
+    }
     await operationRepository.transition(input.operationId, 'created', 'reserved');
   } catch (error) {
+    if (pointsReserved) {
+      try { await pointRepository.release(input.userId, input.operationId, input.cost); } catch { /* preserve original failure */ }
+    }
     try { await operationRepository.transition(input.operationId, 'created', 'cancelled', { finishedAt: new Date().toISOString(), errorCode: 'RESERVATION_FAILED' }); } catch { /* preserve original failure */ }
     throw error;
   }

@@ -13,7 +13,7 @@ describe('operation service', () => {
     };
     const repository: OperationRepository = {
       create: vi.fn(async () => undefined),
-      find: vi.fn(async () => ({ ...base, status: 'reserved' })),
+      find: vi.fn(async () => ({ ...base, status: 'reserved' as const })),
       transition: vi.fn(async () => undefined),
     };
     const points: PointRepository = { reserve: vi.fn(async () => undefined), capture: vi.fn(async () => undefined), release: vi.fn(async () => undefined) };

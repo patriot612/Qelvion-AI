@@ -44,9 +44,12 @@ export class D1HeavyTaskProcessor {
 
     if (operation.status === 'running') {
       try {
-        const result = await this.executeTask(task, operation.provider, operation.model);
-        await this.env.QELVION_DB.prepare('UPDATE operations SET metadata_json = ? WHERE operation_id = ?')
-          .bind(JSON.stringify({ ...JSON.parse(operation.metadataJson || '{}'), result }), operation.operationId).run();
+        const existingMetadata = JSON.parse(operation.metadataJson || '{}') as { result?: string };
+        const result = existingMetadata.result ?? await this.executeTask(task, operation.provider, operation.model);
+        if (existingMetadata.result === undefined) {
+          await this.env.QELVION_DB.prepare('UPDATE operations SET metadata_json = ? WHERE operation_id = ?')
+            .bind(JSON.stringify({ ...existingMetadata, result }), operation.operationId).run();
+        }
         await this.operations.transition(operation.operationId, 'running', 'delivery_pending');
         operation = (await this.operations.find(task.operationId))!;
       } catch (error) {

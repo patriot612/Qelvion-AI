@@ -7,7 +7,7 @@
     {
       "binding": "QELVION_DB",
       "database_name": "qelvion-ai-db",
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "database_id": "23d62e19-79be-4d7e-b32e-df431535fff3",
       "migrations_dir": "src/db/migrations"
     }
   ],

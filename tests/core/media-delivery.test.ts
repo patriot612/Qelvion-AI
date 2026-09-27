@@ -3,7 +3,7 @@ import { deliverMediaResult } from '../../src/queue/consumer/delivery';
 
 vi.mock('grammy', async () => {
   class MockInputFile { constructor(public data: unknown, public filename?: string) {} }
-  const api = { sendPhoto: vi.fn(), sendAudio: vi.fn(), sendVoice: vi.fn(), sendDocument: vi.fn() };
+  const api = { sendPhoto: vi.fn().mockResolvedValue({ message_id: 42 }), sendAudio: vi.fn().mockResolvedValue({ message_id: 43 }), sendVoice: vi.fn().mockResolvedValue({ message_id: 44 }), sendDocument: vi.fn().mockResolvedValue({ message_id: 45 }) };
   class Bot { api = api; constructor() {} }
   return { Bot, InputFile: MockInputFile };
 });

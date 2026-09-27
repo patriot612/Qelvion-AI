@@ -29,31 +29,31 @@ export async function deliverMediaResult(
     case 'image':
       if (data) {
         const sent = await bot.api.sendPhoto(telegramUserId, new InputFile(data.bytes, 'qelvion-image.bin'), { caption: 'Готово.' });
-        return sent.message_id ?? null;
+        return sent?.message_id ?? null;
       } else {
         const sent = await bot.api.sendPhoto(telegramUserId, payload.result, { caption: 'Готово.' });
-        return sent.message_id ?? null;
+        return sent?.message_id ?? null;
       }
     case 'audio':
       if (data) {
         const sent = await bot.api.sendAudio(telegramUserId, new InputFile(data.bytes, 'qelvion-audio.mp3'), { caption: 'Готово.' });
-        return sent.message_id ?? null;
+        return sent?.message_id ?? null;
       } else {
         const sent = await bot.api.sendAudio(telegramUserId, payload.result, { caption: 'Готово.' });
-        return sent.message_id ?? null;
+        return sent?.message_id ?? null;
       }
     case 'voice':
       if (data) {
         const sent = await bot.api.sendVoice(telegramUserId, new InputFile(data.bytes, 'qelvion-voice.ogg'), { caption: 'Готово.' });
-        return sent.message_id ?? null;
+        return sent?.message_id ?? null;
       } else {
         const sent = await bot.api.sendVoice(telegramUserId, payload.result, { caption: 'Готово.' });
-        return sent.message_id ?? null;
+        return sent?.message_id ?? null;
       }
     case 'document': {
       const bytes = new TextEncoder().encode(result);
       const sent = await bot.api.sendDocument(telegramUserId, new InputFile(bytes, 'qelvion-result.txt'), { caption: 'Готово.' });
-      return sent.message_id ?? null;
+      return sent?.message_id ?? null;
     }
   }
 }

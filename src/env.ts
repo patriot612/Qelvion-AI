@@ -8,6 +8,9 @@ export interface Env {
   ANTHROPIC_API_KEY?: string;
   GOOGLE_AI_API_KEY?: string;
   OPENROUTER_API_KEY?: string;
+  XKIRO_API_KEY?: string;
+  GROQ_API_KEY?: string;
+  POLLINATIONS_API_KEY?: string;
   SEARXNG_BASE_URL?: string;
   SEARXNG_USERNAME?: string;
   SEARXNG_PASSWORD?: string;

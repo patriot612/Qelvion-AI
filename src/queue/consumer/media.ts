@@ -9,12 +9,22 @@ export async function executeMediaTask(
   task: HeavyTaskMessage,
 ): Promise<string> {
   const capability = task.type === 'voice' ? 'audio' : task.type;
-  const result = await generateMediaWithGateway(providers, model, capability, {
+  const format = typeof task.metadata.format === 'string'
+    ? task.metadata.format
+    : task.type === 'voice'
+      ? 'opus'
+      : task.type === 'audio'
+        ? 'mp3'
+        : undefined;
+  const voice = typeof task.metadata.voice === 'string' ? task.metadata.voice : undefined;
+  const size = typeof task.metadata.size === 'string' ? task.metadata.size : undefined;
+  const input = {
     prompt: task.prompt,
     input: typeof task.metadata.input === 'string' ? task.metadata.input : task.prompt,
-    voice: typeof task.metadata.voice === 'string' ? task.metadata.voice : undefined,
-    format: typeof task.metadata.format === 'string' ? task.metadata.format : task.type === 'voice' ? 'opus' : task.type === 'audio' ? 'mp3' : undefined,
-    size: typeof task.metadata.size === 'string' ? task.metadata.size : undefined,
-  });
+    ...(voice === undefined ? {} : { voice }),
+    ...(format === undefined ? {} : { format }),
+    ...(size === undefined ? {} : { size }),
+  };
+  const result = await generateMediaWithGateway(providers, model, capability, input);
   return result.result;
 }

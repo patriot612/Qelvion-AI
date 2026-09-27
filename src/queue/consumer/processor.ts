@@ -4,11 +4,8 @@ import { executeMediaTask } from './media';
 import { D1OperationRepository } from '../../db/repositories/operations';
 import { D1PointRepository } from '../../db/repositories/points';
 import { D1ModelRegistry } from '../../ai/registry';
-import { createOpenAIProvider } from '../../ai/providers/openai';
-import { createAnthropicProvider } from '../../ai/providers/anthropic';
-import { createGoogleProvider } from '../../ai/providers/google';
-import { createOpenRouterProvider } from '../../ai/providers/openrouter';
 import type { AiProvider } from '../../ai/gateway/types';
+import { createConfiguredProviders } from '../../ai/providers/factory';
 import { settleOperation } from '../../core/operations/service';
 import { assertOperationTransition } from '../../core/operations/state';
 import type { OperationType } from '../../core/operations/types';
@@ -23,12 +20,7 @@ export class D1HeavyTaskProcessor {
     this.operations = new D1OperationRepository(env.QELVION_DB);
     this.points = new D1PointRepository(env.QELVION_DB);
     this.models = new D1ModelRegistry(env.QELVION_DB);
-    this.providers = [
-      createOpenAIProvider(env.OPENAI_API_KEY),
-      createAnthropicProvider(env.ANTHROPIC_API_KEY),
-      createGoogleProvider(env.GOOGLE_AI_API_KEY),
-      createOpenRouterProvider(env.OPENROUTER_API_KEY),
-    ].filter((provider): provider is AiProvider => Boolean(provider));
+    this.providers = createConfiguredProviders(env);
   }
 
   async process(task: HeavyTaskMessage, deliveryAttempt = 1, maxRetries = 5): Promise<void> {

@@ -5,10 +5,12 @@ import { D1ConfigRepository } from '../db/repositories/config';
 import { D1AdminRepository } from '../db/repositories/admin';
 import { D1UserRepository } from '../db/repositories/users';
 import type { OperationStatus, OperationType } from '../core/operations/types';
+import type { AiCapability } from '../ai/gateway/types';
 
 const CONFIG_KEYS = new Set(['search.price','search.results_limit','search.editor_model','search.timeout_ms','search.enabled','search.language','search.safesearch','search.time_range','chat.model']);
 const OPERATION_TYPES: readonly OperationType[] = ['chat','search','image','document','audio','voice','payment'];
 const OPERATION_STATUSES: readonly OperationStatus[] = ['created','reserved','running','succeeded','failed','cancelled','delivery_pending','delivered'];
+const AI_CAPABILITIES: readonly AiCapability[] = ['chat','search-editor','image','audio','document','vision','structured'];
 
 function parseOptionalEnum<T extends string>(value: string | null, allowed: readonly T[]): T | undefined {
   if (!value) return undefined;
@@ -113,7 +115,9 @@ export async function handleAdminApi(request: Request, env: Env): Promise<Respon
           }
         }
       } else if (action === 'subscription') {
-        if (typeof body.value !== 'string') throw new Response('subscription value required', { status: 400 });
+        if (typeof body.value !== 'string' || !body.value) throw new Response('subscription value required', { status: 400 });
+        const tariff = await env.QELVION_DB.prepare('SELECT key FROM tariffs WHERE key = ?').bind(body.value).first<{ key: string }>();
+        if (!tariff) throw new Response('Unknown subscription tariff', { status: 400 });
         await env.QELVION_DB.prepare('UPDATE users SET subscription_status = ?, updated_at = ? WHERE id = ?').bind(body.value, new Date().toISOString(), userId).run();
       } else {
         if (body.value !== 'active' && body.value !== 'blocked') throw new Response('status must be active/blocked', { status: 400 });
@@ -127,7 +131,7 @@ export async function handleAdminApi(request: Request, env: Env): Promise<Respon
     if (request.method === 'GET' && path === 'models') return Response.json({ models: await models.list() });
     if (request.method === 'POST' && path === 'models') {
       const body = await jsonBody<{ key: string; name: string; provider: string; providerModelId: string; capabilities: string[]; active?: boolean; accessLevel?: string; pointCost?: number; config?: Record<string, unknown> }>(request);
-      if (!body.key || !body.provider || !body.providerModelId || !Array.isArray(body.capabilities)) throw new Response('Invalid model', { status: 400 });
+      if (!body.key || !body.provider || !body.providerModelId || !Array.isArray(body.capabilities) || !body.capabilities.every((value) => typeof value === 'string' && AI_CAPABILITIES.includes(value as AiCapability))) throw new Response('Invalid model capabilities', { status: 400 });
       await env.QELVION_DB.prepare('INSERT INTO models (key,name,provider,provider_model_id,capabilities_json,active,access_level,point_cost,config_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(key) DO UPDATE SET name=excluded.name,provider=excluded.provider,provider_model_id=excluded.provider_model_id,capabilities_json=excluded.capabilities_json,active=excluded.active,access_level=excluded.access_level,point_cost=excluded.point_cost,config_json=excluded.config_json,updated_at=excluded.updated_at')
         .bind(body.key, body.name, body.provider, body.providerModelId, JSON.stringify(body.capabilities), body.active === false ? 0 : 1, body.accessLevel ?? 'daily', positiveInt(body.pointCost ?? 0, 'pointCost'), JSON.stringify(body.config ?? {}), new Date().toISOString(), new Date().toISOString()).run();
       await repo.addAudit({ adminTelegramId, targetUserId: null, action: 'model.upsert', beforeJson: '{}', afterJson: JSON.stringify({ key: body.key, provider: body.provider, providerModelId: body.providerModelId }) });

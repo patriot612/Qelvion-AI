@@ -33,7 +33,7 @@ export async function settleOperation(
   if (operation.status === 'reserved') {
     try {
       await operationRepository.transition(operationId, 'reserved', 'running', { attempt: operation.attempt + 1, startedAt: new Date().toISOString() });
-      operation = (await operationRepository.find(operationId)) ?? { ...operation, status: 'running' };
+      operation = { ...operation, status: 'running' };
     } catch (error) {
       const latest = await operationRepository.find(operationId);
       if (latest && (latest.status === 'succeeded' || latest.status === 'failed' || latest.status === 'cancelled' || latest.status === 'delivered' || latest.status === 'delivery_pending')) return;
